@@ -1,6 +1,7 @@
 import { Client, GatewayIntentBits, Collection, REST, Routes, Events, ActivityType, AutocompleteInteraction, AttachmentBuilder } from 'discord.js';
 import { config } from 'dotenv';
 import { DatabaseManager } from './database';
+import { processBossKill } from './commands/boss';
 import { BOSSES, searchBosses } from './bosses';
 import * as cron from 'node-cron';
 import * as fs from 'fs';
@@ -506,6 +507,8 @@ class LordNineBossBot {
       
       if (customId.startsWith('setup_')) {
         await this.handleSetupSelectMenu(interaction);
+      } else if (customId.startsWith('boss_killed_')) {
+        await this.handleBossKillSelectMenu(interaction);
       }
     } catch (error) {
       console.error('Error handling select menu interaction:', error);
@@ -514,6 +517,31 @@ class LordNineBossBot {
       if (!interaction.replied && !interaction.deferred) {
         try {
           await interaction.reply({ content: 'There was an error processing your selection!', ephemeral: true });
+        } catch (replyError) {
+          console.error('Error sending error reply:', replyError);
+        }
+      }
+    }
+  }
+
+  private async handleBossKillSelectMenu(interaction: any): Promise<void> {
+    try {
+      const { customId, values } = interaction;
+      
+      // Parse the custom ID to get the time parameter
+      // Format: boss_killed_{category}_{timeStr}
+      const parts = customId.split('_');
+      const timeStr = parts.slice(3).join('_'); // Rejoin in case time has underscores
+      const selectedBossId = values[0];
+      
+      // Process the boss kill with the selected boss and time
+      await processBossKill(selectedBossId, timeStr === 'now' ? null : timeStr, interaction, this.db);
+    } catch (error) {
+      console.error('Error handling boss kill selection:', error);
+      
+      if (!interaction.replied && !interaction.deferred) {
+        try {
+          await interaction.reply({ content: '❌ There was an error processing the boss kill!', ephemeral: true });
         } catch (replyError) {
           console.error('Error sending error reply:', replyError);
         }

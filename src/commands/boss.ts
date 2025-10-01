@@ -121,13 +121,6 @@ export const data = new SlashCommandBuilder()
       .setDescription('Report that a boss was killed')
       .addStringOption(option =>
         option
-          .setName('name')
-          .setDescription('Boss name')
-          .setRequired(true)
-          .setAutocomplete(true)
-      )
-      .addStringOption(option =>
-        option
           .setName('time')
           .setDescription('Kill time in 12-hour format (e.g., 2:30 PM) or leave blank for now')
           .setRequired(false)
@@ -205,6 +198,9 @@ export async function execute(interaction: ChatInputCommandInteraction, db: Data
       await interaction.reply('Unknown subcommand.');
   }
 }
+
+// Export the processBossKill function for use in interaction handlers
+export { processBossKill };
 
 async function handleSetupCommand(interaction: ChatInputCommandInteraction, db: DatabaseManager) {
   // Check if user has administrator permissions
@@ -291,81 +287,86 @@ async function handleSetupCommand(interaction: ChatInputCommandInteraction, db: 
 }
 
 async function handleKilledCommand(interaction: ChatInputCommandInteraction, db: DatabaseManager) {
-  const bossName = interaction.options.getString('name', true);
   const timeStr = interaction.options.getString('time');
 
-  const boss = getBossById(bossName.toLowerCase().replace(/\s+/g, ''));
-  if (!boss) {
-    await interaction.reply(`❌ Boss "${bossName}" not found. Use \`/boss list\` to see available bosses.`);
-    return;
-  }
-
-  let killTime = getCurrentGMT8Time(); // Default to current GMT+8 time
-  
-  if (timeStr) {
-    // Parse 12-hour format time in GMT+8
-    try {
-      killTime = parseTimeInput(timeStr);
-    } catch (error) {
-      await interaction.reply({
-        content: '❌ Invalid time format. Please use 12-hour format like:\n• `2:30 PM`\n• `10:15 AM`\n• `6:00 PM`\n\nOr leave blank to use current time (GMT+8 Philippines timezone).',
-        ephemeral: true
-      });
-      return;
-    }
-  } else {
-    // Convert current GMT+8 time to UTC for storage
-    killTime = convertGMT8ToUTC(killTime);
-  }
-
-  // Get guild settings to use the correct notification channel
-  const settings = await db.getGuildSettings(interaction.guild!.id);
-  const channelId = settings.notificationChannel || interaction.channel!.id;
-
-  const nextSpawnTime = new Date(killTime.getTime() + (boss.cycleHours * 60 * 60 * 1000));
-
-  const timer: BossTimer = {
-    bossId: boss.id,
-    guildId: interaction.guild!.id,
-    channelId: channelId,
-    lastKillTime: killTime,
-    nextSpawnTime: nextSpawnTime,
-    isActive: true
-  };
-
-  await db.setBossTimer(timer);
-
+  // Create boss selection UI
   const embed = new EmbedBuilder()
-    .setTitle(`🗡️ ${boss.name} Killed!`)
-    .setDescription(`**${boss.name}** (Lv.${boss.level}) was killed at **${boss.location}**\n*🌏 Times shown in Philippines GMT+8 timezone*`)
-    .addFields(
-      { name: '⚔️ Kill Time', value: `<t:${Math.floor(killTime.getTime() / 1000)}:F>`, inline: true },
-      { name: '⏰ Next Spawn', value: `<t:${Math.floor(nextSpawnTime.getTime() / 1000)}:R>`, inline: true },
-      { name: '🔄 Cycle', value: `${boss.cycleHours}h`, inline: true }
-    )
-    .setColor('#e74c3c')
-    .setThumbnail(`attachment://${boss.id}.png`)
-    .setTimestamp();
+    .setTitle('🗡️ Report Boss Kill')
+    .setDescription('Select the boss that was killed:')
+    .setColor('#e74c3c');
 
-  // Try to attach boss image if it exists
-  const imagePath = path.join(__dirname, '..', '..', 'images', `${boss.id}.png`);
-  const files = [];
-  
-  if (fs.existsSync(imagePath)) {
-    const attachment = new AttachmentBuilder(imagePath, { name: `${boss.id}.png` });
-    files.push(attachment);
+  if (timeStr) {
+    embed.addFields({ name: '⏰ Kill Time', value: `${timeStr} (GMT+8)`, inline: true });
+  } else {
+    embed.addFields({ name: '⏰ Kill Time', value: 'Current time (GMT+8)', inline: true });
   }
 
-  const row = new ActionRowBuilder<ButtonBuilder>()
-    .addComponents(
-      new ButtonBuilder()
-        .setCustomId(`dynamic_timer_${boss.id}`)
-        .setLabel('📊 Create Live Timer')
-        .setStyle(ButtonStyle.Primary)
-        .setEmoji('⏱️')
-    );
+  // Create boss category select menus
+  const shortCycleBosses = getBossesByCategory('short');
+  const longCycleBosses = getBossesByCategory('long');
+  const scheduledBosses = getBossesByCategory('scheduled');
 
-  await interaction.reply({ embeds: [embed], files, components: [row] });
+  const rows = [];
+
+  // Short cycle bosses dropdown
+  if (shortCycleBosses.length > 0) {
+    const shortCycleSelect = new StringSelectMenuBuilder()
+      .setCustomId(`boss_killed_short_${timeStr || 'now'}`)
+      .setPlaceholder('🔵 Short Cycle Bosses (10-21h)')
+      .addOptions(
+        shortCycleBosses.map(boss => 
+          new StringSelectMenuOptionBuilder()
+            .setLabel(`${boss.name} (Lv.${boss.level})`)
+            .setDescription(`${boss.location} - ${boss.cycleHours}h cycle`)
+            .setValue(boss.id)
+            .setEmoji('🔵')
+        )
+      );
+    
+    rows.push(new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(shortCycleSelect));
+  }
+
+  // Long cycle bosses dropdown
+  if (longCycleBosses.length > 0) {
+    const longCycleSelect = new StringSelectMenuBuilder()
+      .setCustomId(`boss_killed_long_${timeStr || 'now'}`)
+      .setPlaceholder('🟣 Long Cycle Bosses (24-48h)')
+      .addOptions(
+        longCycleBosses.slice(0, 25).map(boss => // Discord limit of 25 options
+          new StringSelectMenuOptionBuilder()
+            .setLabel(`${boss.name} (Lv.${boss.level})`)
+            .setDescription(`${boss.location} - ${boss.cycleHours}h cycle`)
+            .setValue(boss.id)
+            .setEmoji('🟣')
+        )
+      );
+    
+    rows.push(new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(longCycleSelect));
+  }
+
+  // Scheduled bosses dropdown
+  if (scheduledBosses.length > 0) {
+    const scheduledSelect = new StringSelectMenuBuilder()
+      .setCustomId(`boss_killed_scheduled_${timeStr || 'now'}`)
+      .setPlaceholder('🟡 Scheduled Bosses')
+      .addOptions(
+        scheduledBosses.map(boss => 
+          new StringSelectMenuOptionBuilder()
+            .setLabel(`${boss.name} (Lv.${boss.level})`)
+            .setDescription(`${boss.location} - ${boss.scheduledTimes?.join(', ') || 'Scheduled'}`)
+            .setValue(boss.id)
+            .setEmoji('🟡')
+        )
+      );
+    
+    rows.push(new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(scheduledSelect));
+  }
+
+  await interaction.reply({
+    embeds: [embed],
+    components: rows,
+    ephemeral: true
+  });
 }
 
 async function handleStatusCommand(interaction: ChatInputCommandInteraction, db: DatabaseManager) {
@@ -540,7 +541,7 @@ async function handleListCommand(interaction: ChatInputCommandInteraction) {
 
   embed.addFields({
     name: 'ℹ️ How to Use',
-    value: '• `/boss setup` - Configure notifications (Admin)\n• `/boss killed <name>` - Report boss kill\n• `/boss killed <name> <time>` - Set kill time (e.g., "2:30 PM")\n• `/boss status <name>` - Check timer\n• `/boss status` - View all timers\n\n🌏 **All times use Philippines GMT+8 timezone**',
+    value: '• `/boss setup` - Configure notifications (Admin)\n• `/boss killed` - Report boss kill (UI selection)\n• `/boss killed <time>` - Set kill time (e.g., "2:30 PM")\n• `/boss status <name>` - Check timer\n• `/boss status` - View all timers\n\n🌏 **All times use Philippines GMT+8 timezone**',
     inline: false
   });
 
@@ -571,6 +572,83 @@ async function handleRemoveCommand(interaction: ChatInputCommandInteraction, db:
     .setTimestamp();
 
   await interaction.reply({ embeds: [embed] });
+}
+
+// Function to process boss kill after selection from UI
+async function processBossKill(bossId: string, timeStr: string | null, interaction: any, db: DatabaseManager) {
+  const boss = getBossById(bossId);
+  if (!boss) {
+    await interaction.reply({ content: '❌ Boss not found!', ephemeral: true });
+    return;
+  }
+
+  let killTime = getCurrentGMT8Time(); // Default to current GMT+8 time
+  
+  if (timeStr && timeStr !== 'now') {
+    // Parse 12-hour format time in GMT+8
+    try {
+      killTime = parseTimeInput(timeStr);
+    } catch (error) {
+      await interaction.reply({
+        content: '❌ Invalid time format. Please use 12-hour format like:\n• `2:30 PM`\n• `10:15 AM`\n• `6:00 PM`\n\nOr leave blank to use current time (GMT+8 Philippines timezone).',
+        ephemeral: true
+      });
+      return;
+    }
+  } else {
+    // Convert current GMT+8 time to UTC for storage
+    killTime = convertGMT8ToUTC(killTime);
+  }
+
+  // Get guild settings to use the correct notification channel
+  const settings = await db.getGuildSettings(interaction.guild!.id);
+  const channelId = settings.notificationChannel || interaction.channel!.id;
+
+  const nextSpawnTime = new Date(killTime.getTime() + (boss.cycleHours * 60 * 60 * 1000));
+
+  const timer: BossTimer = {
+    bossId: boss.id,
+    guildId: interaction.guild!.id,
+    channelId: channelId,
+    lastKillTime: killTime,
+    nextSpawnTime: nextSpawnTime,
+    isActive: true
+  };
+
+  await db.setBossTimer(timer);
+
+  const embed = new EmbedBuilder()
+    .setTitle(`🗡️ ${boss.name} Killed!`)
+    .setDescription(`**${boss.name}** (Lv.${boss.level}) was killed at **${boss.location}**\n*🌏 Times shown in Philippines GMT+8 timezone*`)
+    .addFields(
+      { name: '⚔️ Kill Time', value: `<t:${Math.floor(killTime.getTime() / 1000)}:F>`, inline: true },
+      { name: '⏰ Next Spawn', value: `<t:${Math.floor(nextSpawnTime.getTime() / 1000)}:R>`, inline: true },
+      { name: '🔄 Cycle', value: `${boss.cycleHours}h`, inline: true }
+    )
+    .setColor('#e74c3c')
+    .setThumbnail(`attachment://${boss.id}.png`)
+    .setTimestamp();
+
+  // Try to attach boss image if it exists
+  const imagePath = path.join(__dirname, '..', '..', 'images', `${boss.id}.png`);
+  const files = [];
+  
+  if (fs.existsSync(imagePath)) {
+    const attachment = new AttachmentBuilder(imagePath, { name: `${boss.id}.png` });
+    files.push(attachment);
+  }
+
+  const row = new ActionRowBuilder<ButtonBuilder>()
+    .addComponents(
+      new ButtonBuilder()
+        .setCustomId(`dynamic_timer_${boss.id}`)
+        .setLabel('📊 Create Live Timer')
+        .setStyle(ButtonStyle.Primary)
+        .setEmoji('⏱️')
+    );
+
+  // Update the original message with the kill confirmation
+  await interaction.update({ embeds: [embed], files, components: [row] });
 }
 
 async function handleSettingsCommand(interaction: ChatInputCommandInteraction, db: DatabaseManager) {
