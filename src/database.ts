@@ -12,6 +12,7 @@ export class DatabaseManager {
     });
 
     await this.createTables();
+    await this.migrateDatabase();
   }
 
   private async createTables(): Promise<void> {
@@ -54,6 +55,31 @@ export class DatabaseManager {
         UNIQUE(boss_id, guild_id, message_id)
       );
     `);
+  }
+
+  private async migrateDatabase(): Promise<void> {
+    if (!this.db) throw new Error('Database not initialized');
+
+    // Check if the new columns exist
+    const tableInfo = await this.db.all("PRAGMA table_info(boss_timers)");
+    const hasWarningColumn = tableInfo.some((col: any) => col.name === 'warning_sent');
+    const hasReadyColumn = tableInfo.some((col: any) => col.name === 'ready_sent');
+
+    if (!hasWarningColumn || !hasReadyColumn) {
+      console.log('🔄 Migrating database to add notification tracking columns...');
+      
+      if (!hasWarningColumn) {
+        await this.db.exec('ALTER TABLE boss_timers ADD COLUMN warning_sent INTEGER DEFAULT 0');
+        console.log('✅ Added warning_sent column');
+      }
+      
+      if (!hasReadyColumn) {
+        await this.db.exec('ALTER TABLE boss_timers ADD COLUMN ready_sent INTEGER DEFAULT 0');
+        console.log('✅ Added ready_sent column');
+      }
+      
+      console.log('✅ Database migration completed');
+    }
   }
 
   async setBossTimer(timer: BossTimer): Promise<void> {
