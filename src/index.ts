@@ -509,17 +509,25 @@ class LordNineBossBot {
       }
     } catch (error) {
       console.error('Error handling select menu interaction:', error);
-      const reply = { content: 'There was an error processing your selection!', ephemeral: true };
       
-      if (interaction.replied || interaction.deferred) {
-        await interaction.followUp(reply);
-      } else {
-        await interaction.reply(reply);
+      // Only reply if interaction hasn't been acknowledged yet
+      if (!interaction.replied && !interaction.deferred) {
+        try {
+          await interaction.reply({ content: 'There was an error processing your selection!', ephemeral: true });
+        } catch (replyError) {
+          console.error('Error sending error reply:', replyError);
+        }
       }
     }
   }
 
   private async handleSetupSelectMenu(interaction: any): Promise<void> {
+    // Check if interaction is still valid
+    if (!interaction.guild || !interaction.user) {
+      console.log('Invalid interaction - missing guild or user');
+      return;
+    }
+
     const { customId } = interaction;
     
     // Store the selection temporarily (we'll use a simple map for this demo)
@@ -528,36 +536,62 @@ class LordNineBossBot {
     }
     
     const userId = interaction.user.id;
-    const guildId = interaction.guild!.id;
+    const guildId = interaction.guild.id;
     const sessionKey = `${guildId}_${userId}`;
     
     let session = this.setupSessions.get(sessionKey) || {};
     
-    switch (customId) {
-      case 'setup_channel_select':
-        session.channelId = interaction.values[0];
-        await interaction.reply({ content: '✅ Channel selected!', ephemeral: true });
-        break;
-        
-      case 'setup_role_select':
-        session.roleId = interaction.values[0] || null;
-        await interaction.reply({ content: '✅ Role selected!', ephemeral: true });
-        break;
-        
-      case 'setup_warning_select':
-        session.warningMinutes = parseInt(interaction.values[0]);
-        await interaction.reply({ content: '✅ Warning time selected!', ephemeral: true });
-        break;
+    try {
+      switch (customId) {
+        case 'setup_channel_select':
+          session.channelId = interaction.values[0];
+          if (!interaction.replied && !interaction.deferred) {
+            await interaction.reply({ content: '✅ Channel selected!', ephemeral: true });
+          }
+          break;
+          
+        case 'setup_role_select':
+          session.roleId = interaction.values[0] || null;
+          if (!interaction.replied && !interaction.deferred) {
+            await interaction.reply({ content: '✅ Role selected!', ephemeral: true });
+          }
+          break;
+          
+        case 'setup_warning_select':
+          session.warningMinutes = parseInt(interaction.values[0]);
+          if (!interaction.replied && !interaction.deferred) {
+            await interaction.reply({ content: '✅ Warning time selected!', ephemeral: true });
+          }
+          break;
+      }
+      
+      this.setupSessions.set(sessionKey, session);
+      
+      // Update the original message to enable/disable the finish button
+      await this.updateSetupMessage(interaction, session);
+      
+    } catch (error) {
+      console.error('Error in handleSetupSelectMenu:', error);
+      
+      // Only reply if we haven't already
+      if (!interaction.replied && !interaction.deferred) {
+        try {
+          await interaction.reply({ content: '❌ Error processing selection', ephemeral: true });
+        } catch (replyError) {
+          console.error('Error sending error reply:', replyError);
+        }
+      }
     }
-    
-    this.setupSessions.set(sessionKey, session);
-    
-    // Update the original message to enable/disable the finish button
-    await this.updateSetupMessage(interaction, session);
   }
 
   private async updateSetupMessage(interaction: any, session: any): Promise<void> {
     try {
+      // Don't update if interaction is too old or invalid
+      if (!interaction.message) {
+        console.log('No message to update');
+        return;
+      }
+
       const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ChannelSelectMenuBuilder, RoleSelectMenuBuilder, StringSelectMenuBuilder, StringSelectMenuOptionBuilder, ChannelType } = await import('discord.js');
       
       const embed = new EmbedBuilder()
@@ -641,63 +675,152 @@ class LordNineBossBot {
       const row4 = new ActionRowBuilder().addComponents(finishButton);
 
       // Try to edit the original interaction message
-      const originalMessage = await interaction.message;
-      if (originalMessage) {
-        await originalMessage.edit({
+      try {
+        await interaction.message.edit({
           embeds: [embed],
           components: [row1, row2, row3, row4]
         });
+      } catch (editError) {
+        console.error('Error editing setup message:', editError);
       }
+      
     } catch (error) {
       console.error('Error updating setup message:', error);
     }
   }
 
   private async handleSetupFinish(interaction: any): Promise<void> {
-    const userId = interaction.user.id;
-    const guildId = interaction.guild!.id;
-    const sessionKey = `${guildId}_${userId}`;
-    
-    const session = this.setupSessions.get(sessionKey);
-    
-    if (!session || !session.channelId) {
-      await interaction.reply({ content: '❌ Please select a notification channel first!', ephemeral: true });
+    if (!interaction.guild) {
+      console.log('Setup finish interaction received outside of guild');
       return;
     }
 
-    // Save settings to database
-    await this.db.setGuildSettings(guildId, {
-      notificationChannel: session.channelId,
-      mentionRole: session.roleId || null,
-      warningMinutes: session.warningMinutes || 5
-    });
-
-    // Clean up session
-    this.setupSessions.delete(sessionKey);
-
-    // Create success embed
-    const { EmbedBuilder } = await import('discord.js');
-    const embed = new EmbedBuilder()
-      .setTitle('✅ Boss Notification Settings Saved!')
-      .setDescription('Your guild settings have been configured successfully!')
-      .addFields(
-        { name: '📢 Notification Channel', value: `<#${session.channelId}>`, inline: true },
-        { name: '👥 Mention Role', value: session.roleId ? `<@&${session.roleId}>` : 'None', inline: true },
-        { name: '⏰ Warning Time', value: `${session.warningMinutes || 5} minutes`, inline: true }
-      )
-      .setColor('#27ae60')
-      .setTimestamp();
-
-    await interaction.reply({ embeds: [embed], ephemeral: true });
-
-    // Update the original message to show completion
     try {
-      await interaction.message.edit({
-        embeds: [embed],
-        components: [] // Remove all components
-      });
+      // Acknowledge the interaction immediately
+      if (!interaction.replied && !interaction.deferred) {
+        await interaction.deferUpdate();
+      }
+
+      const userId = interaction.user.id;
+      const guildId = interaction.guild.id;
+      const sessionKey = `${guildId}_${userId}`;
+      
+      const session = this.setupSessions.get(sessionKey);
+      
+      if (!session) {
+        console.log('No setup session found for key:', sessionKey);
+        
+        const { EmbedBuilder } = await import('discord.js');
+        const errorEmbed = new EmbedBuilder()
+          .setTitle('❌ Setup Session Expired')
+          .setDescription('The setup session has expired. Please run `/boss setup` again.')
+          .setColor('#e74c3c');
+
+        try {
+          if (interaction.deferred) {
+            await interaction.editReply({ embeds: [errorEmbed], components: [] });
+          } else if (!interaction.replied) {
+            await interaction.reply({ embeds: [errorEmbed], components: [], ephemeral: true });
+          }
+        } catch (replyError) {
+          console.error('Error sending session expired message:', replyError);
+        }
+        return;
+      }
+
+      if (!session.channelId) {
+        console.log('Setup incomplete - no channel selected for session:', sessionKey);
+        
+        const { EmbedBuilder } = await import('discord.js');
+        const incompleteEmbed = new EmbedBuilder()
+          .setTitle('⚠️ Setup Incomplete')
+          .setDescription('Please select a notification channel before completing setup.')
+          .setColor('#f39c12');
+
+        try {
+          if (interaction.deferred) {
+            await interaction.editReply({ embeds: [incompleteEmbed] });
+          } else if (!interaction.replied) {
+            await interaction.reply({ embeds: [incompleteEmbed], ephemeral: true });
+          }
+        } catch (replyError) {
+          console.error('Error sending incomplete setup message:', replyError);
+        }
+        return;
+      }
+
+      // Save settings to database
+      try {
+        await this.db.setGuildSettings(guildId, {
+          notificationChannel: session.channelId,
+          mentionRole: session.roleId || null,
+          warningMinutes: session.warningMinutes || 5
+        });
+
+        console.log('Guild settings saved successfully for guild:', guildId);
+
+        // Create success embed
+        const { EmbedBuilder } = await import('discord.js');
+        const embed = new EmbedBuilder()
+          .setTitle('✅ Boss Notification Settings Saved!')
+          .setDescription('Your guild settings have been configured successfully!')
+          .addFields(
+            { name: '📢 Notification Channel', value: `<#${session.channelId}>`, inline: true },
+            { name: '👥 Mention Role', value: session.roleId ? `<@&${session.roleId}>` : 'None', inline: true },
+            { name: '⏰ Warning Time', value: `${session.warningMinutes || 5} minutes`, inline: true }
+          )
+          .setColor('#27ae60')
+          .setTimestamp()
+          .setFooter({ text: 'You can now use /boss killed to track boss spawns!' });
+
+        // Update the original message
+        try {
+          if (interaction.deferred) {
+            await interaction.editReply({ embeds: [embed], components: [] });
+          } else if (!interaction.replied) {
+            await interaction.reply({ embeds: [embed], components: [] });
+          }
+        } catch (replyError) {
+          console.error('Error sending success message:', replyError);
+        }
+
+        // Clean up session
+        this.setupSessions.delete(sessionKey);
+        console.log('Setup session cleaned up for key:', sessionKey);
+
+      } catch (dbError) {
+        console.error('Database error during setup completion:', dbError);
+        
+        const { EmbedBuilder } = await import('discord.js');
+        const errorEmbed = new EmbedBuilder()
+          .setTitle('❌ Setup Failed')
+          .setDescription('An error occurred while saving your settings. Please try again.')
+          .setColor('#e74c3c');
+
+        try {
+          if (interaction.deferred) {
+            await interaction.editReply({ embeds: [errorEmbed], components: [] });
+          } else if (!interaction.replied) {
+            await interaction.reply({ embeds: [errorEmbed], components: [], ephemeral: true });
+          }
+        } catch (replyError) {
+          console.error('Error sending database error message:', replyError);
+        }
+      }
     } catch (error) {
-      console.error('Error updating original setup message:', error);
+      console.error('Error handling setup finish:', error);
+      
+      // Try to send an error response if we haven't already
+      if (!interaction.replied && !interaction.deferred) {
+        try {
+          await interaction.reply({ 
+            content: '❌ An error occurred while processing your request. Please try again.', 
+            ephemeral: true 
+          });
+        } catch (replyError) {
+          console.error('Error sending error reply:', replyError);
+        }
+      }
     }
   }
 }

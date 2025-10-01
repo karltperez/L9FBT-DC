@@ -5,6 +5,82 @@ import { BossTimer } from '../types';
 import * as fs from 'fs';
 import * as path from 'path';
 
+// Helper function to parse 12-hour time format
+function parseTimeInput(timeStr: string): Date {
+  const now = new Date();
+  
+  // Clean up the input
+  const cleanTime = timeStr.trim().toUpperCase();
+  
+  // Regex to match various 12-hour formats
+  const timeRegex = /^(\d{1,2}):?(\d{0,2})\s*(AM|PM)?$/i;
+  const match = cleanTime.match(timeRegex);
+  
+  if (!match) {
+    throw new Error('Invalid time format');
+  }
+  
+  let hours = parseInt(match[1]);
+  const minutes = match[2] ? parseInt(match[2]) : 0;
+  const ampm = match[3] ? match[3].toUpperCase() : null;
+  
+  // Validate hours and minutes
+  if (hours < 1 || hours > 12 || minutes < 0 || minutes > 59) {
+    throw new Error('Invalid time values');
+  }
+  
+  // If no AM/PM specified, try to determine based on context
+  if (!ampm) {
+    // If time is between 1-11, assume it's in the past few hours
+    const currentHour = now.getHours();
+    const currentHour12 = currentHour > 12 ? currentHour - 12 : (currentHour === 0 ? 12 : currentHour);
+    
+    // Simple heuristic: if the time is close to current time, assume same period
+    if (Math.abs(hours - currentHour12) <= 2) {
+      // Same AM/PM as current time
+      if (currentHour >= 12) {
+        hours = hours === 12 ? 12 : hours + 12;
+      } else {
+        hours = hours === 12 ? 0 : hours;
+      }
+    } else {
+      // Assume it was recent (past few hours)
+      if (currentHour >= 12) {
+        // Currently PM, assume the time was PM if reasonable, otherwise AM
+        if (hours >= 6) {
+          hours = hours === 12 ? 12 : hours + 12; // PM
+        } else {
+          hours = hours === 12 ? 0 : hours; // AM
+        }
+      } else {
+        // Currently AM, assume the time was AM if reasonable, otherwise previous day PM
+        if (hours <= currentHour12 + 2) {
+          hours = hours === 12 ? 0 : hours; // AM
+        } else {
+          hours = hours === 12 ? 12 : hours + 12; // Previous day PM
+        }
+      }
+    }
+  } else {
+    // Convert to 24-hour format
+    if (ampm === 'PM' && hours !== 12) {
+      hours += 12;
+    } else if (ampm === 'AM' && hours === 12) {
+      hours = 0;
+    }
+  }
+  
+  // Create the date with today's date and the specified time
+  const result = new Date(now.getFullYear(), now.getMonth(), now.getDate(), hours, minutes, 0, 0);
+  
+  // If the time is in the future (more than 1 hour), assume it was yesterday
+  if (result.getTime() - now.getTime() > 3600000) {
+    result.setDate(result.getDate() - 1);
+  }
+  
+  return result;
+}
+
 export const data = new SlashCommandBuilder()
   .setName('boss')
   .setDescription('Manage field boss timers')
@@ -27,7 +103,7 @@ export const data = new SlashCommandBuilder()
       .addStringOption(option =>
         option
           .setName('time')
-          .setDescription('Kill time (optional, defaults to now)')
+          .setDescription('Kill time in 12-hour format (e.g., 2:30 PM) or leave blank for now')
           .setRequired(false)
       )
   )
@@ -199,10 +275,17 @@ async function handleKilledCommand(interaction: ChatInputCommandInteraction, db:
   }
 
   let killTime = new Date();
+  
   if (timeStr) {
-    const parsedTime = new Date(timeStr);
-    if (!isNaN(parsedTime.getTime())) {
-      killTime = parsedTime;
+    // Parse 12-hour format time
+    killTime = parseTimeInput(timeStr);
+    
+    if (isNaN(killTime.getTime())) {
+      await interaction.reply({
+        content: '❌ Invalid time format. Please use 12-hour format like:\n• `2:30 PM`\n• `10:15 AM`\n• `6:00 PM`\n\nOr leave blank to use current time.',
+        ephemeral: true
+      });
+      return;
     }
   }
 
@@ -428,7 +511,7 @@ async function handleListCommand(interaction: ChatInputCommandInteraction) {
 
   embed.addFields({
     name: 'ℹ️ How to Use',
-    value: '• `/boss setup` - Configure notifications (Admin)\n• `/boss killed <name>` - Report boss kill\n• `/boss status <name>` - Check timer\n• `/boss status` - View all timers',
+    value: '• `/boss setup` - Configure notifications (Admin)\n• `/boss killed <name>` - Report boss kill\n• `/boss killed <name> <time>` - Set kill time (e.g., "2:30 PM")\n• `/boss status <name>` - Check timer\n• `/boss status` - View all timers',
     inline: false
   });
 
