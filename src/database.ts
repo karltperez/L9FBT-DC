@@ -85,8 +85,14 @@ export class DatabaseManager {
   async setBossTimer(timer: BossTimer): Promise<void> {
     if (!this.db) throw new Error('Database not initialized');
 
+    // First, clear any existing notification flags for this boss to prevent spam
     await this.db.run(`
-      INSERT OR REPLACE INTO boss_timers 
+      DELETE FROM boss_timers WHERE boss_id = ? AND guild_id = ?
+    `, [timer.bossId, timer.guildId]);
+
+    // Insert the new timer with fresh notification flags (default 0)
+    await this.db.run(`
+      INSERT INTO boss_timers 
       (boss_id, guild_id, channel_id, last_kill_time, next_spawn_time, is_active, warning_sent, ready_sent, updated_at)
       VALUES (?, ?, ?, ?, ?, ?, 0, 0, strftime('%s', 'now'))
     `, [

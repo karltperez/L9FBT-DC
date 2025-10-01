@@ -1,4 +1,4 @@
-import { Client, GatewayIntentBits, Collection, REST, Routes, Events, ActivityType, AutocompleteInteraction, AttachmentBuilder } from 'discord.js';
+import { Client, GatewayIntentBits, Collection, REST, Routes, Events, ActivityType, AutocompleteInteraction, AttachmentBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } from 'discord.js';
 import { config } from 'dotenv';
 import { DatabaseManager } from './database';
 import { processBossKill } from './commands/boss';
@@ -173,39 +173,7 @@ class LordNineBossBot {
   }
 
   private startNotificationScheduler(): void {
-    // Check for boss spawns and update timers every minute
-    cron.schedule('* * * * *', async () => {
-      try {
-        const timers = await this.db.getActiveTimers();
-        const now = new Date();
-
-        for (const timer of timers) {
-          const timeUntilSpawn = timer.nextSpawnTime.getTime() - now.getTime();
-          const minutesUntilSpawn = Math.floor(timeUntilSpawn / (1000 * 60));
-
-          // Get guild settings for warning time
-          const settings = await this.db.getGuildSettings(timer.guildId);
-
-          // Check if boss is ready to spawn
-          if (timeUntilSpawn <= 0 && !timer.ready_sent) {
-            await this.sendBossNotification(timer, true);
-            await this.db.updateNotificationFlags(timer.bossId, timer.guildId, true, true);
-          }
-          // Check if within warning time
-          else if (minutesUntilSpawn === settings.warningMinutes && !timer.warning_sent) {
-            await this.sendBossNotification(timer, false);
-            await this.db.updateNotificationFlags(timer.bossId, timer.guildId, true, false);
-          }
-
-          // Update dynamic timer messages (if any exist)
-          await this.updateDynamicTimerMessages(timer);
-        }
-      } catch (error) {
-        console.error('Error in notification scheduler:', error);
-      }
-    });
-
-    // Update dynamic timers more frequently (every 30 seconds) for smoother updates
+    // Update dynamic timers every 30 seconds for live countdown display
     cron.schedule('*/30 * * * * *', async () => {
       try {
         await this.updateAllDynamicTimers();
@@ -214,7 +182,7 @@ class LordNineBossBot {
       }
     });
 
-    // Cleanup old ready bosses every hour
+    // Cleanup old ready bosses every hour (remove timers that have been ready for 12+ hours)
     cron.schedule('0 * * * *', async () => {
       try {
         await this.cleanupOldTimers();
@@ -223,63 +191,7 @@ class LordNineBossBot {
       }
     });
 
-    console.log('⏰ Notification scheduler started');
-  }
-
-  private async sendBossNotification(timer: any, isReady: boolean): Promise<void> {
-    try {
-      const guild = this.client.guilds.cache.get(timer.guildId);
-      if (!guild) return;
-
-      const channel = guild.channels.cache.get(timer.channelId);
-      if (!channel || !channel.isTextBased()) return;
-
-      const boss = BOSSES.find(b => b.id === timer.bossId);
-      if (!boss) return;
-
-      // Get guild settings for mention role
-      const settings = await this.db.getGuildSettings(timer.guildId);
-      const mentionText = settings.mentionRole ? `<@&${settings.mentionRole}> ` : '';
-
-      const embed = {
-        title: isReady ? '🚨 Boss Ready!' : '⚠️ Boss Warning!',
-        description: isReady 
-          ? `**${boss.name}** (Lv.${boss.level}) is ready to spawn at **${boss.location}**!`
-          : `**${boss.name}** (Lv.${boss.level}) will spawn in **${settings.warningMinutes} minutes** at **${boss.location}**!`,
-        color: isReady ? 0x27ae60 : 0xf39c12,
-        timestamp: new Date().toISOString(),
-        fields: [
-          {
-            name: '📍 Location',
-            value: boss.location,
-            inline: true
-          },
-          {
-            name: '🔄 Cycle',
-            value: `${boss.cycleHours}h`,
-            inline: true
-          },
-          {
-            name: '⏰ Spawn Time',
-            value: `<t:${Math.floor(timer.nextSpawnTime.getTime() / 1000)}:F>`,
-            inline: true
-          }
-        ]
-      };
-
-      await channel.send({ 
-        content: mentionText,
-        embeds: [embed] 
-      });
-
-      // If boss is ready, mark as notified or reset timer
-      if (isReady) {
-        // Optionally, you could remove the timer or set it to inactive here
-        // await this.db.deleteBossTimer(timer.bossId, timer.guildId);
-      }
-    } catch (error) {
-      console.error('Error sending boss notification:', error);
-    }
+    console.log('⏰ Dynamic timer updater started');
   }
 
   private async updateDynamicTimerMessages(timer: any): Promise<void> {
@@ -344,6 +256,7 @@ class LordNineBossBot {
       } else {
         // Handle individual boss timer updates
         const updatedEmbed = await this.createDynamicTimerEmbed(boss, timer);
+        const components = this.createTimerComponents(timer);
         
         // Try to attach boss image if it exists
         const imagePath = path.join(__dirname, '..', 'images', `${boss.id}.png`);
@@ -354,7 +267,7 @@ class LordNineBossBot {
           files.push(attachment);
         }
 
-        await message.edit({ embeds: [updatedEmbed], files });
+        await message.edit({ embeds: [updatedEmbed], files, components });
       }
     } catch (error) {
       console.error('Error updating single dynamic timer:', error);
@@ -478,6 +391,32 @@ class LordNineBossBot {
 
   private async handleButtonInteraction(interaction: any): Promise<void> {
     try {
+      if (interaction.customId.startsWith('boss_killed_')) {
+        // Handle "Boss Killed" button click
+        const parts = interaction.customId.split('_');
+        const bossId = parts[2];
+        const guildId = parts[3];
+        
+        const boss = BOSSES.find(b => b.id === bossId);
+        if (!boss) {
+          await interaction.reply({ content: '❌ Boss not found!', ephemeral: true });
+          return;
+        }
+
+        // Get current GMT+8 time for the kill time
+        const killTime = getCurrentGMT8Time();
+        const timeStr = killTime.toLocaleTimeString('en-US', { 
+          hour: 'numeric', 
+          minute: '2-digit', 
+          hour12: true,
+          timeZone: 'Asia/Manila'
+        });
+        
+        // Process the boss kill using the existing function
+        await processBossKill(bossId, timeStr, interaction, this.db);
+        return;
+      }
+
       if (interaction.customId.startsWith('dynamic_timer_')) {
         const bossId = interaction.customId.replace('dynamic_timer_', '');
         const boss = BOSSES.find(b => b.id === bossId);
@@ -893,6 +832,19 @@ class LordNineBossBot {
     } catch (error) {
       console.error('Error in cleanup old timers:', error);
     }
+  }
+
+  private createTimerComponents(timer: any): ActionRowBuilder<ButtonBuilder>[] {
+    const row = new ActionRowBuilder<ButtonBuilder>()
+      .addComponents(
+        new ButtonBuilder()
+          .setCustomId(`boss_killed_${timer.bossId}_${timer.guildId}`)
+          .setLabel('Boss Killed')
+          .setStyle(ButtonStyle.Danger)
+          .setEmoji('⚔️')
+      );
+
+    return [row];
   }
 }
 

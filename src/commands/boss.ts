@@ -444,7 +444,21 @@ async function handleStatusCommand(interaction: ChatInputCommandInteraction, db:
       files.push(attachment);
     }
 
-    const reply = await interaction.reply({ embeds: [embed], files });
+    // Create "Boss Killed" button
+    const components = [];
+    if (!isReady) { // Only show button if boss is not ready yet
+      const row = new ActionRowBuilder<ButtonBuilder>()
+        .addComponents(
+          new ButtonBuilder()
+            .setCustomId(`boss_killed_${boss.id}_${interaction.guild!.id}`)
+            .setLabel('Boss Killed')
+            .setStyle(ButtonStyle.Danger)
+            .setEmoji('⚔️')
+        );
+      components.push(row);
+    }
+
+    const reply = await interaction.reply({ embeds: [embed], files, components });
     
     // Store this message for dynamic updates
     const message = await reply.fetch();
