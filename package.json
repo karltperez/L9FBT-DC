@@ -28,6 +28,10 @@
     "url": "https://github.com/karltperez/L9FBT-DC/issues"
   },
   "homepage": "https://github.com/karltperez/L9FBT-DC#readme",
+  "engines": {
+    "node": ">=18.0.0",
+    "npm": ">=8.0.0"
+  },
   "dependencies": {
     "@types/node": "^24.5.2",
     "@types/sqlite3": "^3.1.11",
