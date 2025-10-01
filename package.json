@@ -1,0 +1,42 @@
+{
+  "name": "lord-nine-boss-timer-bot",
+  "version": "1.0.0",
+  "description": "Discord bot for tracking Lord Nine field boss timers with automated notifications and slash commands",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "dev": "ts-node src/index.ts",
+    "watch": "tsc --watch",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "discord",
+    "bot",
+    "lord-nine",
+    "boss-timer",
+    "gaming",
+    "mmorpg"
+  ],
+  "author": "Karl Perez",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/karltperez/L9FBT-DC.git"
+  },
+  "bugs": {
+    "url": "https://github.com/karltperez/L9FBT-DC/issues"
+  },
+  "homepage": "https://github.com/karltperez/L9FBT-DC#readme",
+  "dependencies": {
+    "@types/node": "^24.5.2",
+    "@types/sqlite3": "^3.1.11",
+    "discord.js": "^14.22.1",
+    "dotenv": "^17.2.2",
+    "node-cron": "^4.2.1",
+    "sqlite": "^5.1.1",
+    "sqlite3": "^5.1.7",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.9.2"
+  }
+}
