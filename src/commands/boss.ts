@@ -289,69 +289,36 @@ async function handleSetupCommand(interaction: ChatInputCommandInteraction, db: 
 async function handleKilledCommand(interaction: ChatInputCommandInteraction, db: DatabaseManager) {
   const timeStr = interaction.options.getString('time');
 
-  // Create boss kill UI with time selection
+  // Create boss kill UI with integrated time display
   const embed = new EmbedBuilder()
     .setTitle('🗡️ Report Boss Kill')
-    .setDescription('Select the boss that was killed and when:')
-    .setColor('#e74c3c')
-    .addFields({
-      name: '📝 Instructions',
-      value: '1️⃣ Select the boss from the categories below\n2️⃣ Choose kill time (or use "Now" for current time)',
-      inline: false
-    });
+    .setDescription('Select the boss that was killed:')
+    .setColor('#e74c3c');
 
-  const rows = [];
-
-  // Time selection dropdown (first row)
-  const timeSelect = new StringSelectMenuBuilder()
-    .setCustomId('boss_time_select')
-    .setPlaceholder('⏰ Select kill time...')
-    .addOptions([
-      new StringSelectMenuOptionBuilder()
-        .setLabel('Now (Current Time)')
-        .setDescription('Use current GMT+8 time')
-        .setValue('now')
-        .setEmoji('🕐')
-        .setDefault(!timeStr),
-      new StringSelectMenuOptionBuilder()
-        .setLabel('15 minutes ago')
-        .setDescription('Boss was killed 15 minutes ago')
-        .setValue('15min_ago')
-        .setEmoji('🕐'),
-      new StringSelectMenuOptionBuilder()
-        .setLabel('30 minutes ago')
-        .setDescription('Boss was killed 30 minutes ago')
-        .setValue('30min_ago')
-        .setEmoji('🕐'),
-      new StringSelectMenuOptionBuilder()
-        .setLabel('1 hour ago')
-        .setDescription('Boss was killed 1 hour ago')
-        .setValue('1hour_ago')
-        .setEmoji('🕐'),
-      new StringSelectMenuOptionBuilder()
-        .setLabel('2 hours ago')
-        .setDescription('Boss was killed 2 hours ago')
-        .setValue('2hour_ago')
-        .setEmoji('🕐'),
-      new StringSelectMenuOptionBuilder()
-        .setLabel('Custom Time')
-        .setDescription('Enter custom time (will prompt for input)')
-        .setValue('custom')
-        .setEmoji('🕕')
-    ]);
-
+  // Add time information to the embed
   if (timeStr) {
-    timeSelect.addOptions(
-      new StringSelectMenuOptionBuilder()
-        .setLabel(`Specified: ${timeStr}`)
-        .setDescription(`Use the specified time: ${timeStr}`)
-        .setValue(`custom_${timeStr}`)
-        .setEmoji('✅')
-        .setDefault(true)
-    );
+    embed.addFields({ 
+      name: '⏰ Kill Time', 
+      value: `**${timeStr}** (GMT+8)\n*Time has been set - now select the boss below*`, 
+      inline: false 
+    });
+  } else {
+    embed.addFields({ 
+      name: '⏰ Kill Time', 
+      value: '**Current time** (GMT+8)\n*Using current time - select the boss below*', 
+      inline: false 
+    });
   }
 
-  rows.push(new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(timeSelect));
+  embed.addFields({
+    name: '📝 Instructions',
+    value: timeStr 
+      ? '✅ Time set! Now choose the boss from the categories below:' 
+      : '� **Tip:** Use `/boss killed time:2:30 PM` to set a specific kill time',
+    inline: false
+  });
+
+  const rows = [];
 
   // Boss category select menus
   const shortCycleBosses = getBossesByCategory('short');
@@ -361,7 +328,7 @@ async function handleKilledCommand(interaction: ChatInputCommandInteraction, db:
   // Short cycle bosses dropdown
   if (shortCycleBosses.length > 0) {
     const shortCycleSelect = new StringSelectMenuBuilder()
-      .setCustomId('boss_killed_short')
+      .setCustomId(`boss_killed_short_${timeStr || 'now'}`)
       .setPlaceholder('🔵 Short Cycle Bosses (10-21h)')
       .addOptions(
         shortCycleBosses.map(boss => 
@@ -379,7 +346,7 @@ async function handleKilledCommand(interaction: ChatInputCommandInteraction, db:
   // Long cycle bosses dropdown
   if (longCycleBosses.length > 0) {
     const longCycleSelect = new StringSelectMenuBuilder()
-      .setCustomId('boss_killed_long')
+      .setCustomId(`boss_killed_long_${timeStr || 'now'}`)
       .setPlaceholder('🟣 Long Cycle Bosses (24-48h)')
       .addOptions(
         longCycleBosses.slice(0, 25).map(boss => // Discord limit of 25 options
@@ -397,7 +364,7 @@ async function handleKilledCommand(interaction: ChatInputCommandInteraction, db:
   // Scheduled bosses dropdown
   if (scheduledBosses.length > 0) {
     const scheduledSelect = new StringSelectMenuBuilder()
-      .setCustomId('boss_killed_scheduled')
+      .setCustomId(`boss_killed_scheduled_${timeStr || 'now'}`)
       .setPlaceholder('🟡 Scheduled Bosses')
       .addOptions(
         scheduledBosses.map(boss => 
@@ -591,7 +558,7 @@ async function handleListCommand(interaction: ChatInputCommandInteraction) {
 
   embed.addFields({
     name: 'ℹ️ How to Use',
-    value: '• `/boss setup` - Configure notifications (Admin)\n• `/boss killed` - Report boss kill (UI selection)\n• `/boss killed <time>` - Set kill time (e.g., "2:30 PM")\n• `/boss status <name>` - Check timer\n• `/boss status` - View all timers\n\n🌏 **All times use Philippines GMT+8 timezone**',
+    value: '• `/boss setup` - Configure notifications (Admin)\n• `/boss killed` - Report boss kill (select from UI)\n• `/boss killed time:2:30 PM` - Report with specific time\n• `/boss status <name>` - Check timer\n• `/boss status` - View all timers\n\n🌏 **All times use Philippines GMT+8 timezone**',
     inline: false
   });
 

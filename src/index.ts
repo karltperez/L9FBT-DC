@@ -26,7 +26,6 @@ class LordNineBossBot {
   private client: BotClient;
   private db: DatabaseManager;
   private setupSessions: Map<string, any> = new Map();
-  private bossKillSessions: Map<string, any> = new Map();
 
   constructor() {
     this.setupSessions = new Map();
@@ -518,8 +517,6 @@ class LordNineBossBot {
         await this.handleSetupSelectMenu(interaction);
       } else if (customId.startsWith('boss_killed_')) {
         await this.handleBossKillSelectMenu(interaction);
-      } else if (customId === 'boss_time_select') {
-        await this.handleTimeSelectMenu(interaction);
       }
     } catch (error) {
       console.error('Error handling select menu interaction:', error);
@@ -535,138 +532,18 @@ class LordNineBossBot {
     }
   }
 
-  private async handleTimeSelectMenu(interaction: any): Promise<void> {
-    try {
-      const { values, user, guild } = interaction;
-      const selectedTime = values[0];
-      
-      if (!guild || !user) {
-        await interaction.reply({ content: '❌ Invalid interaction context!', ephemeral: true });
-        return;
-      }
-
-      const sessionKey = `${guild.id}_${user.id}`;
-      
-      // Store the selected time in the session
-      let session = this.bossKillSessions.get(sessionKey) || {};
-      session.selectedTime = selectedTime;
-      session.timestamp = Date.now();
-      this.bossKillSessions.set(sessionKey, session);
-
-      // Convert time selection to readable format
-      let timeDisplay = 'Current time (GMT+8)';
-      switch (selectedTime) {
-        case 'now':
-          timeDisplay = 'Current time (GMT+8)';
-          break;
-        case '15min_ago':
-          timeDisplay = '15 minutes ago';
-          break;
-        case '30min_ago':
-          timeDisplay = '30 minutes ago';
-          break;
-        case '1hour_ago':
-          timeDisplay = '1 hour ago';
-          break;
-        case '2hour_ago':
-          timeDisplay = '2 hours ago';
-          break;
-        case 'custom':
-          // This would require a modal - for now, acknowledge and ask for clarification
-          await interaction.reply({ 
-            content: '⏰ For custom time, please use `/boss killed time:2:30 PM` format. For now, selecting "Current time".', 
-            ephemeral: true 
-          });
-          session.selectedTime = 'now';
-          this.bossKillSessions.set(sessionKey, session);
-          return;
-        default:
-          if (selectedTime.startsWith('custom_')) {
-            timeDisplay = selectedTime.replace('custom_', '');
-          }
-          break;
-      }
-
-      await interaction.reply({ 
-        content: `⏰ Time selected: **${timeDisplay}**\nNow select the boss that was killed from the dropdowns above.`, 
-        ephemeral: true 
-      });
-
-    } catch (error) {
-      console.error('Error handling time selection:', error);
-      
-      if (!interaction.replied && !interaction.deferred) {
-        try {
-          await interaction.reply({ content: '❌ Error processing time selection!', ephemeral: true });
-        } catch (replyError) {
-          console.error('Error sending error reply:', replyError);
-        }
-      }
-    }
-  }
-
   private async handleBossKillSelectMenu(interaction: any): Promise<void> {
     try {
-      const { customId, values, user, guild } = interaction;
+      const { customId, values } = interaction;
       
-      if (!guild || !user) {
-        await interaction.reply({ content: '❌ Invalid interaction context!', ephemeral: true });
-        return;
-      }
-
-      const sessionKey = `${guild.id}_${user.id}`;
-      const session = this.bossKillSessions.get(sessionKey);
-      
-      if (!session || !session.selectedTime) {
-        await interaction.reply({ 
-          content: '⏰ Please select a kill time first from the time dropdown above!', 
-          ephemeral: true 
-        });
-        return;
-      }
-
+      // Parse the custom ID to get the time parameter
+      // Format: boss_killed_{category}_{timeStr}
+      const parts = customId.split('_');
+      const timeStr = parts.slice(3).join('_'); // Rejoin in case time has underscores
       const selectedBossId = values[0];
       
-      // Convert the session time to the format expected by processBossKill
-      let timeStr = null;
-      
-      if (session.selectedTime !== 'now') {
-        // Calculate the actual time based on selection
-        const currentTime = getCurrentGMT8Time();
-        let killTime = currentTime;
-        
-        switch (session.selectedTime) {
-          case '15min_ago':
-            killTime = new Date(currentTime.getTime() - (15 * 60 * 1000));
-            break;
-          case '30min_ago':
-            killTime = new Date(currentTime.getTime() - (30 * 60 * 1000));
-            break;
-          case '1hour_ago':
-            killTime = new Date(currentTime.getTime() - (60 * 60 * 1000));
-            break;
-          case '2hour_ago':
-            killTime = new Date(currentTime.getTime() - (2 * 60 * 60 * 1000));
-            break;
-          default:
-            if (session.selectedTime.startsWith('custom_')) {
-              timeStr = session.selectedTime.replace('custom_', '');
-            }
-            break;
-        }
-        
-        // If it's a relative time (not custom), format it for display
-        if (!timeStr && session.selectedTime !== 'now') {
-          timeStr = `${killTime.getHours()}:${killTime.getMinutes().toString().padStart(2, '0')} ${killTime.getHours() >= 12 ? 'PM' : 'AM'}`;
-        }
-      }
-      
-      // Clean up the session
-      this.bossKillSessions.delete(sessionKey);
-      
-      // Process the boss kill with the selected boss and calculated time
-      await processBossKill(selectedBossId, timeStr, interaction, this.db);
-      
+      // Process the boss kill with the selected boss and time
+      await processBossKill(selectedBossId, timeStr === 'now' ? null : timeStr, interaction, this.db);
     } catch (error) {
       console.error('Error handling boss kill selection:', error);
       
