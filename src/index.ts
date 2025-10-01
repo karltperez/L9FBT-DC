@@ -87,12 +87,14 @@ class LordNineBossBot {
         await command.execute(interaction, this.db);
       } catch (error) {
         console.error('Error executing command:', error);
-        const reply = { content: 'There was an error while executing this command!', ephemeral: true };
         
-        if (interaction.replied || interaction.deferred) {
-          await interaction.followUp(reply);
-        } else {
-          await interaction.reply(reply);
+        // Only reply if we haven't already replied
+        if (!interaction.replied && !interaction.deferred) {
+          try {
+            await interaction.reply({ content: 'There was an error while executing this command!', ephemeral: true });
+          } catch (replyError) {
+            console.error('Error sending error reply:', replyError);
+          }
         }
       }
     });
