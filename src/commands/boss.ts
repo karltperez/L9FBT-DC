@@ -289,29 +289,79 @@ async function handleSetupCommand(interaction: ChatInputCommandInteraction, db: 
 async function handleKilledCommand(interaction: ChatInputCommandInteraction, db: DatabaseManager) {
   const timeStr = interaction.options.getString('time');
 
-  // Create boss selection UI
+  // Create boss kill UI with time selection
   const embed = new EmbedBuilder()
     .setTitle('🗡️ Report Boss Kill')
-    .setDescription('Select the boss that was killed:')
-    .setColor('#e74c3c');
+    .setDescription('Select the boss that was killed and when:')
+    .setColor('#e74c3c')
+    .addFields({
+      name: '📝 Instructions',
+      value: '1️⃣ Select the boss from the categories below\n2️⃣ Choose kill time (or use "Now" for current time)',
+      inline: false
+    });
+
+  const rows = [];
+
+  // Time selection dropdown (first row)
+  const timeSelect = new StringSelectMenuBuilder()
+    .setCustomId('boss_time_select')
+    .setPlaceholder('⏰ Select kill time...')
+    .addOptions([
+      new StringSelectMenuOptionBuilder()
+        .setLabel('Now (Current Time)')
+        .setDescription('Use current GMT+8 time')
+        .setValue('now')
+        .setEmoji('🕐')
+        .setDefault(!timeStr),
+      new StringSelectMenuOptionBuilder()
+        .setLabel('15 minutes ago')
+        .setDescription('Boss was killed 15 minutes ago')
+        .setValue('15min_ago')
+        .setEmoji('🕐'),
+      new StringSelectMenuOptionBuilder()
+        .setLabel('30 minutes ago')
+        .setDescription('Boss was killed 30 minutes ago')
+        .setValue('30min_ago')
+        .setEmoji('🕐'),
+      new StringSelectMenuOptionBuilder()
+        .setLabel('1 hour ago')
+        .setDescription('Boss was killed 1 hour ago')
+        .setValue('1hour_ago')
+        .setEmoji('🕐'),
+      new StringSelectMenuOptionBuilder()
+        .setLabel('2 hours ago')
+        .setDescription('Boss was killed 2 hours ago')
+        .setValue('2hour_ago')
+        .setEmoji('🕐'),
+      new StringSelectMenuOptionBuilder()
+        .setLabel('Custom Time')
+        .setDescription('Enter custom time (will prompt for input)')
+        .setValue('custom')
+        .setEmoji('🕕')
+    ]);
 
   if (timeStr) {
-    embed.addFields({ name: '⏰ Kill Time', value: `${timeStr} (GMT+8)`, inline: true });
-  } else {
-    embed.addFields({ name: '⏰ Kill Time', value: 'Current time (GMT+8)', inline: true });
+    timeSelect.addOptions(
+      new StringSelectMenuOptionBuilder()
+        .setLabel(`Specified: ${timeStr}`)
+        .setDescription(`Use the specified time: ${timeStr}`)
+        .setValue(`custom_${timeStr}`)
+        .setEmoji('✅')
+        .setDefault(true)
+    );
   }
 
-  // Create boss category select menus
+  rows.push(new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(timeSelect));
+
+  // Boss category select menus
   const shortCycleBosses = getBossesByCategory('short');
   const longCycleBosses = getBossesByCategory('long');
   const scheduledBosses = getBossesByCategory('scheduled');
 
-  const rows = [];
-
   // Short cycle bosses dropdown
   if (shortCycleBosses.length > 0) {
     const shortCycleSelect = new StringSelectMenuBuilder()
-      .setCustomId(`boss_killed_short_${timeStr || 'now'}`)
+      .setCustomId('boss_killed_short')
       .setPlaceholder('🔵 Short Cycle Bosses (10-21h)')
       .addOptions(
         shortCycleBosses.map(boss => 
@@ -329,7 +379,7 @@ async function handleKilledCommand(interaction: ChatInputCommandInteraction, db:
   // Long cycle bosses dropdown
   if (longCycleBosses.length > 0) {
     const longCycleSelect = new StringSelectMenuBuilder()
-      .setCustomId(`boss_killed_long_${timeStr || 'now'}`)
+      .setCustomId('boss_killed_long')
       .setPlaceholder('🟣 Long Cycle Bosses (24-48h)')
       .addOptions(
         longCycleBosses.slice(0, 25).map(boss => // Discord limit of 25 options
@@ -347,7 +397,7 @@ async function handleKilledCommand(interaction: ChatInputCommandInteraction, db:
   // Scheduled bosses dropdown
   if (scheduledBosses.length > 0) {
     const scheduledSelect = new StringSelectMenuBuilder()
-      .setCustomId(`boss_killed_scheduled_${timeStr || 'now'}`)
+      .setCustomId('boss_killed_scheduled')
       .setPlaceholder('🟡 Scheduled Bosses')
       .addOptions(
         scheduledBosses.map(boss => 
