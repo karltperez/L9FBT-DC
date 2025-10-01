@@ -26,6 +26,8 @@ export class DatabaseManager {
         last_kill_time INTEGER NOT NULL,
         next_spawn_time INTEGER NOT NULL,
         is_active INTEGER DEFAULT 1,
+        warning_sent INTEGER DEFAULT 0,
+        ready_sent INTEGER DEFAULT 0,
         created_at INTEGER DEFAULT (strftime('%s', 'now')),
         updated_at INTEGER DEFAULT (strftime('%s', 'now')),
         UNIQUE(boss_id, guild_id)
@@ -59,8 +61,8 @@ export class DatabaseManager {
 
     await this.db.run(`
       INSERT OR REPLACE INTO boss_timers 
-      (boss_id, guild_id, channel_id, last_kill_time, next_spawn_time, is_active, updated_at)
-      VALUES (?, ?, ?, ?, ?, ?, strftime('%s', 'now'))
+      (boss_id, guild_id, channel_id, last_kill_time, next_spawn_time, is_active, warning_sent, ready_sent, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, 0, 0, strftime('%s', 'now'))
     `, [
       timer.bossId,
       timer.guildId,
@@ -105,7 +107,9 @@ export class DatabaseManager {
       channelId: row.channel_id,
       lastKillTime: new Date(row.last_kill_time * 1000),
       nextSpawnTime: new Date(row.next_spawn_time * 1000),
-      isActive: row.is_active === 1
+      isActive: row.is_active === 1,
+      warning_sent: row.warning_sent === 1,
+      ready_sent: row.ready_sent === 1
     }));
   }
 
@@ -228,5 +232,15 @@ export class DatabaseManager {
   async cleanupDynamicTimerMessages(bossId: string, guildId: string): Promise<void> {
     if (!this.db) throw new Error('Database not initialized');
     await this.db.run('DELETE FROM dynamic_timer_messages WHERE boss_id = ? AND guild_id = ?', [bossId, guildId]);
+  }
+
+  async updateNotificationFlags(bossId: string, guildId: string, warningSent: boolean, readySent: boolean): Promise<void> {
+    if (!this.db) throw new Error('Database not initialized');
+
+    await this.db.run(`
+      UPDATE boss_timers 
+      SET warning_sent = ?, ready_sent = ?, updated_at = strftime('%s', 'now')
+      WHERE boss_id = ? AND guild_id = ?
+    `, [warningSent ? 1 : 0, readySent ? 1 : 0, bossId, guildId]);
   }
 }

@@ -15,4 +15,6 @@ export interface BossTimer {
   lastKillTime: Date;
   nextSpawnTime: Date;
   isActive: boolean;
+  warning_sent?: boolean;
+  ready_sent?: boolean;
 }

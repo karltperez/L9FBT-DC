@@ -599,10 +599,10 @@ async function processBossKill(bossId: string, timeStr: string | null, interacti
     return;
   }
 
-  let killTime = getCurrentGMT8Time(); // Default to current GMT+8 time
+  let killTime: Date;
   
   if (timeStr && timeStr !== 'now') {
-    // Parse 12-hour format time in GMT+8
+    // Parse 12-hour format time in GMT+8 (already returns UTC)
     try {
       killTime = parseTimeInput(timeStr);
     } catch (error) {
@@ -613,8 +613,9 @@ async function processBossKill(bossId: string, timeStr: string | null, interacti
       return;
     }
   } else {
-    // Convert current GMT+8 time to UTC for storage
-    killTime = convertGMT8ToUTC(killTime);
+    // Use current GMT+8 time and convert to UTC for storage
+    const currentGMT8 = getCurrentGMT8Time();
+    killTime = convertGMT8ToUTC(currentGMT8);
   }
 
   // Get guild settings to use the correct notification channel

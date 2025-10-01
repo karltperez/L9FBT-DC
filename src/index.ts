@@ -184,9 +184,15 @@ class LordNineBossBot {
           // Get guild settings for warning time
           const settings = await this.db.getGuildSettings(timer.guildId);
 
-          // Check if boss is ready to spawn or within warning time
-          if (timeUntilSpawn <= 0 || minutesUntilSpawn === settings.warningMinutes) {
-            await this.sendBossNotification(timer, minutesUntilSpawn <= 0);
+          // Check if boss is ready to spawn
+          if (timeUntilSpawn <= 0 && !timer.ready_sent) {
+            await this.sendBossNotification(timer, true);
+            await this.db.updateNotificationFlags(timer.bossId, timer.guildId, true, true);
+          }
+          // Check if within warning time
+          else if (minutesUntilSpawn === settings.warningMinutes && !timer.warning_sent) {
+            await this.sendBossNotification(timer, false);
+            await this.db.updateNotificationFlags(timer.bossId, timer.guildId, true, false);
           }
 
           // Update dynamic timer messages (if any exist)
@@ -203,6 +209,15 @@ class LordNineBossBot {
         await this.updateAllDynamicTimers();
       } catch (error) {
         console.error('Error updating dynamic timers:', error);
+      }
+    });
+
+    // Cleanup old ready bosses every hour
+    cron.schedule('0 * * * *', async () => {
+      try {
+        await this.cleanupOldTimers();
+      } catch (error) {
+        console.error('Error cleaning up old timers:', error);
       }
     });
 
@@ -857,6 +872,24 @@ class LordNineBossBot {
           console.error('Error sending error reply:', replyError);
         }
       }
+    }
+  }
+
+  private async cleanupOldTimers(): Promise<void> {
+    try {
+      const timers = await this.db.getActiveTimers();
+      const now = new Date();
+      const oneHour = 60 * 60 * 1000; // 1 hour in milliseconds
+
+      for (const timer of timers) {
+        // If boss spawn time was more than 1 hour ago and it's marked as ready
+        if (timer.ready_sent && (now.getTime() - timer.nextSpawnTime.getTime()) > oneHour) {
+          await this.db.deleteBossTimer(timer.bossId, timer.guildId);
+          console.log(`🧹 Cleaned up old timer for ${timer.bossId} in guild ${timer.guildId}`);
+        }
+      }
+    } catch (error) {
+      console.error('Error in cleanup old timers:', error);
     }
   }
 }
