@@ -5,9 +5,27 @@ import { BossTimer } from '../types';
 import * as fs from 'fs';
 import * as path from 'path';
 
-// Helper function to parse 12-hour time format
-function parseTimeInput(timeStr: string): Date {
+// Helper function to get current time in GMT+8 (Philippines timezone)
+function getCurrentGMT8Time(): Date {
   const now = new Date();
+  const gmt8Offset = 8 * 60; // GMT+8 in minutes
+  const localOffset = now.getTimezoneOffset(); // Local timezone offset in minutes
+  return new Date(now.getTime() + (gmt8Offset + localOffset) * 60 * 1000);
+}
+
+// Helper function to convert GMT+8 time to UTC for storage
+function convertGMT8ToUTC(gmt8Date: Date): Date {
+  const gmt8Offset = 8 * 60; // GMT+8 in minutes
+  return new Date(gmt8Date.getTime() - (gmt8Offset * 60 * 1000));
+}
+
+// Helper function to parse 12-hour time format in GMT+8 (Philippines timezone)
+function parseTimeInput(timeStr: string): Date {
+  // Get current time in GMT+8 (Philippines timezone)
+  const now = new Date();
+  const gmt8Offset = 8 * 60; // GMT+8 in minutes
+  const localOffset = now.getTimezoneOffset(); // Local timezone offset in minutes
+  const gmt8Now = new Date(now.getTime() + (gmt8Offset + localOffset) * 60 * 1000);
   
   // Clean up the input
   const cleanTime = timeStr.trim().toUpperCase();
@@ -29,10 +47,9 @@ function parseTimeInput(timeStr: string): Date {
     throw new Error('Invalid time values');
   }
   
-  // If no AM/PM specified, try to determine based on context
+  // If no AM/PM specified, try to determine based on context using GMT+8 time
   if (!ampm) {
-    // If time is between 1-11, assume it's in the past few hours
-    const currentHour = now.getHours();
+    const currentHour = gmt8Now.getHours();
     const currentHour12 = currentHour > 12 ? currentHour - 12 : (currentHour === 0 ? 12 : currentHour);
     
     // Simple heuristic: if the time is close to current time, assume same period
@@ -70,15 +87,24 @@ function parseTimeInput(timeStr: string): Date {
     }
   }
   
-  // Create the date with today's date and the specified time
-  const result = new Date(now.getFullYear(), now.getMonth(), now.getDate(), hours, minutes, 0, 0);
+  // Create the date with GMT+8 timezone
+  const result = new Date(gmt8Now.getFullYear(), gmt8Now.getMonth(), gmt8Now.getDate(), hours, minutes, 0, 0);
   
-  // If the time is in the future (more than 1 hour), assume it was yesterday
-  if (result.getTime() - now.getTime() > 3600000) {
+  // Logic for determining if the time was today or yesterday based on GMT+8:
+  // - If the parsed time is more than 2 hours in the future, assume it was yesterday
+  // - If the parsed time is within 2 hours (past or future), assume it's the correct time
+  const timeDifference = result.getTime() - gmt8Now.getTime();
+  const twoHours = 2 * 60 * 60 * 1000;
+  
+  if (timeDifference > twoHours) {
+    // Time is too far in the future, assume it was yesterday
     result.setDate(result.getDate() - 1);
   }
   
-  return result;
+  // Convert back to UTC for storage
+  const utcResult = new Date(result.getTime() - (gmt8Offset * 60 * 1000));
+  
+  return utcResult;
 }
 
 export const data = new SlashCommandBuilder()
@@ -274,19 +300,22 @@ async function handleKilledCommand(interaction: ChatInputCommandInteraction, db:
     return;
   }
 
-  let killTime = new Date();
+  let killTime = getCurrentGMT8Time(); // Default to current GMT+8 time
   
   if (timeStr) {
-    // Parse 12-hour format time
-    killTime = parseTimeInput(timeStr);
-    
-    if (isNaN(killTime.getTime())) {
+    // Parse 12-hour format time in GMT+8
+    try {
+      killTime = parseTimeInput(timeStr);
+    } catch (error) {
       await interaction.reply({
-        content: '❌ Invalid time format. Please use 12-hour format like:\n• `2:30 PM`\n• `10:15 AM`\n• `6:00 PM`\n\nOr leave blank to use current time.',
+        content: '❌ Invalid time format. Please use 12-hour format like:\n• `2:30 PM`\n• `10:15 AM`\n• `6:00 PM`\n\nOr leave blank to use current time (GMT+8 Philippines timezone).',
         ephemeral: true
       });
       return;
     }
+  } else {
+    // Convert current GMT+8 time to UTC for storage
+    killTime = convertGMT8ToUTC(killTime);
   }
 
   // Get guild settings to use the correct notification channel
@@ -308,7 +337,7 @@ async function handleKilledCommand(interaction: ChatInputCommandInteraction, db:
 
   const embed = new EmbedBuilder()
     .setTitle(`🗡️ ${boss.name} Killed!`)
-    .setDescription(`**${boss.name}** (Lv.${boss.level}) was killed at **${boss.location}**`)
+    .setDescription(`**${boss.name}** (Lv.${boss.level}) was killed at **${boss.location}**\n*🌏 Times shown in Philippines GMT+8 timezone*`)
     .addFields(
       { name: '⚔️ Kill Time', value: `<t:${Math.floor(killTime.getTime() / 1000)}:F>`, inline: true },
       { name: '⏰ Next Spawn', value: `<t:${Math.floor(nextSpawnTime.getTime() / 1000)}:R>`, inline: true },
@@ -511,7 +540,7 @@ async function handleListCommand(interaction: ChatInputCommandInteraction) {
 
   embed.addFields({
     name: 'ℹ️ How to Use',
-    value: '• `/boss setup` - Configure notifications (Admin)\n• `/boss killed <name>` - Report boss kill\n• `/boss killed <name> <time>` - Set kill time (e.g., "2:30 PM")\n• `/boss status <name>` - Check timer\n• `/boss status` - View all timers',
+    value: '• `/boss setup` - Configure notifications (Admin)\n• `/boss killed <name>` - Report boss kill\n• `/boss killed <name> <time>` - Set kill time (e.g., "2:30 PM")\n• `/boss status <name>` - Check timer\n• `/boss status` - View all timers\n\n🌏 **All times use Philippines GMT+8 timezone**',
     inline: false
   });
 
