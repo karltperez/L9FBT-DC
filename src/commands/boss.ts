@@ -406,20 +406,13 @@ async function handleStatusCommand(interaction: ChatInputCommandInteraction, db:
     const timeUntilSpawn = timer.nextSpawnTime.getTime() - now.getTime();
     const isReady = timeUntilSpawn <= 0;
 
-    // Calculate more precise time remaining
-    const hours = Math.floor(timeUntilSpawn / (1000 * 60 * 60));
-    const minutes = Math.floor((timeUntilSpawn % (1000 * 60 * 60)) / (1000 * 60));
-    const seconds = Math.floor((timeUntilSpawn % (1000 * 60)) / 1000);
-
+    // Use UNIX timestamp for spawn time display
     let timeDisplay;
     if (isReady) {
       timeDisplay = '**✅ READY TO SPAWN!**';
-    } else if (hours > 0) {
-      timeDisplay = `**${hours}h ${minutes}m ${seconds}s**`;
-    } else if (minutes > 0) {
-      timeDisplay = `**${minutes}m ${seconds}s**`;
     } else {
-      timeDisplay = `**${Math.max(0, seconds)}s**`;
+      // Show countdown using Discord's dynamic timestamp
+      timeDisplay = `<t:${Math.floor(timer.nextSpawnTime.getTime() / 1000)}:R>`;
     }
 
     const embed = new EmbedBuilder()
@@ -427,13 +420,13 @@ async function handleStatusCommand(interaction: ChatInputCommandInteraction, db:
       .setDescription(`**${boss.name}** (Lv.${boss.level}) at **${boss.location}**`)
       .addFields(
         { name: '⚔️ Last Kill', value: `<t:${Math.floor(timer.lastKillTime.getTime() / 1000)}:R>`, inline: true },
-        { name: isReady ? '✅ Status' : '⏰ Time Remaining', value: timeDisplay, inline: true },
+        { name: isReady ? '✅ Status' : '⏰ Spawns', value: timeDisplay, inline: true },
         { name: '🔄 Cycle', value: `${boss.cycleHours}h`, inline: true }
       )
       .setColor(isReady ? '#27ae60' : '#3498db')
       .setThumbnail(`attachment://${boss.id}.png`)
       .setTimestamp()
-      .setFooter({ text: '🔄 Updates every 30 seconds' });
+      .setFooter({ text: '🔄 Updates every 15 minutes' });
 
     // Try to attach boss image if it exists
     const imagePath = path.join(__dirname, '..', '..', 'images', `${boss.id}.png`);
