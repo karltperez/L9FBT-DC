@@ -530,23 +530,17 @@ class LordNineBossBot {
       switch (customId) {
         case 'setup_channel_select':
           session.channelId = interaction.values[0];
-          if (!interaction.replied && !interaction.deferred) {
-            await interaction.reply({ content: '✅ Channel selected!', ephemeral: true });
-          }
+          await interaction.deferUpdate();
           break;
           
         case 'setup_role_select':
           session.roleId = interaction.values[0] || null;
-          if (!interaction.replied && !interaction.deferred) {
-            await interaction.reply({ content: '✅ Role selected!', ephemeral: true });
-          }
+          await interaction.deferUpdate();
           break;
           
         case 'setup_warning_select':
           session.warningMinutes = parseInt(interaction.values[0]);
-          if (!interaction.replied && !interaction.deferred) {
-            await interaction.reply({ content: '✅ Warning time selected!', ephemeral: true });
-          }
+          await interaction.deferUpdate();
           break;
       }
       
