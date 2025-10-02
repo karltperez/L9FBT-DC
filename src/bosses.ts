@@ -5,19 +5,18 @@ export const BOSSES: Boss[] = [
   { id: 'venatus', name: 'Venatus', level: 60, location: 'Corrupted River Stream', cycleHours: 10, category: 'short' },
   { id: 'viorent', name: 'Viorent', level: 65, location: 'Gill Stream', cycleHours: 10, category: 'short' },
   { id: 'ego', name: 'Ego', level: 70, location: 'Reclaimed Gathering Point', cycleHours: 21, category: 'short' },
-  { id: 'araneo', name: 'Araneo', level: 83, location: 'Limestone Cavern', cycleHours: 12, category: 'short' },
-  { id: 'undomiel', name: 'Undomiel', level: 85, location: 'Pearlharbor Passage', cycleHours: 18, category: 'short' },
-  { id: 'livera', name: 'Livera', level: 90, location: 'Hermit\'s Hideaway', cycleHours: 20, category: 'short' },
-
+  { id: 'ladydalia', name: 'Lady Dalia', level: 83, location: 'Coral Beach', cycleHours: 18, category: 'long' },
+  
   // Long Cycle Bosses (24-48h)
-  { id: 'ladydalia', name: 'Lady Dalia', level: 83, location: 'Coral Beach', cycleHours: 24, category: 'long' },
+  { id: 'araneo', name: 'Araneo', level: 83, location: 'Limestone Cavern', cycleHours: 24, category: 'long' },
+  { id: 'undomiel', name: 'Undomiel', level: 85, location: 'Pearlharbor Passage', cycleHours: 24, category: 'long' },
+  { id: 'livera', name: 'Livera', level: 90, location: 'Hermit\'s Hideaway', cycleHours: 24, category: 'long' },
   { id: 'generalaquleus', name: 'General Aquleus', level: 85, location: 'Lower Tomb of Tyriosa 2F', cycleHours: 29, category: 'long' },
+  { id: 'baronbraudmore', name: 'Baron Baraudmore', level: 88, location: 'Rosevine Bridge', cycleHours: 32, category: 'long' },
   { id: 'amentis', name: 'Amentis', level: 88, location: 'Limestone Cape', cycleHours: 29, category: 'long' },
-  { id: 'ordo', name: 'Ordo', level: 90, location: 'Limestone Waterway', cycleHours: 48, category: 'long' },
+  { id: 'ordo', name: 'Ordo', level: 90, location: 'Succesor\'s Paradise', cycleHours: 62, category: 'long' },
   { id: 'larba', name: 'Larba', level: 98, location: 'Garbana Reclaimed Land', cycleHours: 35, category: 'long' },
-  { id: 'ringor', name: 'Ringor', level: 90, location: 'Deserted Nest', cycleHours: 39, category: 'long' },
-  { id: 'thymele', name: 'Thymele', level: 85, location: 'Sludie Snow Field', cycleHours: 37, category: 'long' },
-  { id: 'milavy', name: 'Milavy', level: 90, location: 'Coralline Shallows', cycleHours: 43, category: 'long' },
+
   { id: 'gareth', name: 'Gareth', level: 98, location: 'Deadman\'s Land District 1', cycleHours: 32, category: 'long' },
   { id: 'titore', name: 'Titore', level: 98, location: 'Deadman\'s Land District 2', cycleHours: 37, category: 'long' },
   { id: 'metus', name: 'Metus', level: 93, location: 'Follower\'s Field', cycleHours: 48, category: 'long' },
@@ -25,14 +24,17 @@ export const BOSSES: Boss[] = [
   { id: 'shuliar', name: 'Shuliar', level: 95, location: 'Masquerade of Hounds', cycleHours: 35, category: 'long' },
   { id: 'catena', name: 'Catena', level: 100, location: 'Deadman\'s Land District 3', cycleHours: 35, category: 'long' },
 
-  // Scheduled Bosses (Fixed Times)
-  { id: 'auraq', name: 'Auraq', level: 100, location: 'Deadman\'s Land District 4', cycleHours: 24, category: 'scheduled', scheduledTimes: ['12:00', '20:00'] },
-  { id: 'rohtahzek', name: 'Rohtahzek', level: 95, location: 'Rohtah Cave', cycleHours: 24, category: 'scheduled', scheduledTimes: ['14:00', '22:00'] },
-  { id: 'mutanus', name: 'Mutanus', level: 90, location: 'Mutant\'s Nest', cycleHours: 12, category: 'scheduled', scheduledTimes: ['06:00', '12:00', '18:00'] },
-  { id: 'grezak', name: 'Grezak', level: 88, location: 'Grezak\'s Lair', cycleHours: 18, category: 'scheduled', scheduledTimes: ['08:00', '20:00'] },
-  { id: 'godhun', name: 'Godhun', level: 85, location: 'Godhun\'s Territory', cycleHours: 24, category: 'scheduled', scheduledTimes: ['10:00', '18:00'] },
-  { id: 'taros', name: 'Taros', level: 83, location: 'Taros Valley', cycleHours: 16, category: 'scheduled', scheduledTimes: ['07:00', '15:00', '23:00'] },
-  { id: 'kazar', name: 'Kazar', level: 80, location: 'Kazar\'s Domain', cycleHours: 20, category: 'scheduled', scheduledTimes: ['09:00', '21:00'] }
+  // Scheduled Bosses (Fixed Weekly Times - GMT+8)
+  { id: 'clemantis', name: 'Clemantis', level: 85, location: 'Clemantis Lair', cycleHours: 168, category: 'scheduled', scheduledTimes: ['Monday 11:30', 'Thursday 19:00'] },
+  { id: 'saphirus', name: 'Saphirus', level: 90, location: 'Saphirus Domain', cycleHours: 168, category: 'scheduled', scheduledTimes: ['Sunday 17:00', 'Tuesday 11:30'] },
+  { id: 'neutro', name: 'Neutro', level: 88, location: 'Neutro Zone', cycleHours: 168, category: 'scheduled', scheduledTimes: ['Tuesday 19:00', 'Thursday 11:30'] },
+  { id: 'thymele', name: 'Thymele', level: 85, location: 'Sludie Snow Field', cycleHours: 168, category: 'scheduled', scheduledTimes: ['Monday 19:00', 'Wednesday 11:30'] },
+  { id: 'milavy', name: 'Milavy', level: 90, location: 'Coralline Shallows', cycleHours: 168, category: 'scheduled', scheduledTimes: ['Saturday 15:00'] },
+  { id: 'ringor', name: 'Ringor', level: 90, location: 'Deserted Nest', cycleHours: 168, category: 'scheduled', scheduledTimes: ['Saturday 17:00'] },
+  { id: 'roderick', name: 'Roderick', level: 92, location: 'Roderick\'s Keep', cycleHours: 168, category: 'scheduled', scheduledTimes: ['Friday 19:00'] },
+  { id: 'auraq', name: 'Auraq', level: 100, location: 'Deadman\'s Land District 4', cycleHours: 168, category: 'scheduled', scheduledTimes: ['Friday 22:00', 'Wednesday 21:00'] },
+  { id: 'chaiflock', name: 'Chaiflock', level: 95, location: 'Chaiflock Territory', cycleHours: 168, category: 'scheduled', scheduledTimes: ['Saturday 22:00'] },
+  { id: 'benji', name: 'Benji', level: 87, location: 'Benji\'s Domain', cycleHours: 168, category: 'scheduled', scheduledTimes: ['Sunday 21:00'] }
 ];
 
 export function getBossById(id: string): Boss | undefined {
