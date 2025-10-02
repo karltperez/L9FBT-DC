@@ -1,4 +1,4 @@
-import { Client, GatewayIntentBits, Collection, REST, Routes, Events, ActivityType, AutocompleteInteraction, AttachmentBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } from 'discord.js';
+import { Client, GatewayIntentBits, Collection, REST, Routes, Events, ActivityType, AutocompleteInteraction, AttachmentBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, GuildMember, PermissionFlagsBits } from 'discord.js';
 import { config } from 'dotenv';
 import { DatabaseManager } from './database';
 import { processBossKill } from './commands/boss';
@@ -13,6 +13,37 @@ function getCurrentGMT8Time(): Date {
   const gmt8Offset = 8 * 60; // GMT+8 in minutes
   const localOffset = now.getTimezoneOffset(); // Local timezone offset in minutes
   return new Date(now.getTime() + (gmt8Offset + localOffset) * 60 * 1000);
+}
+
+// Helper function to check if user can use boss tracking buttons
+async function canUseBossButtons(member: GuildMember, db: DatabaseManager): Promise<boolean> {
+  // Allow server administrators
+  if (member.permissions.has(PermissionFlagsBits.Administrator)) {
+    return true;
+  }
+  
+  // Check for custom boss tracker role
+  const settings = await db.getGuildSettings(member.guild.id);
+  if (settings.bossTrackerRole) {
+    return member.roles.cache.has(settings.bossTrackerRole);
+  }
+  
+  // Default: only admins can use buttons
+  return false;
+}
+
+// Helper function to create permission error embed
+function createPermissionErrorEmbed(requiredRole?: string | null) {
+  const description = requiredRole 
+    ? `❌ You need the <@&${requiredRole}> role or Administrator permission to use boss tracking buttons.`
+    : '❌ You need Administrator permission to use boss tracking buttons.';
+    
+  return {
+    color: 0xff0000,
+    title: '🚫 Insufficient Permissions',
+    description,
+    timestamp: new Date().toISOString()
+  };
 }
 
 config();
@@ -386,6 +417,26 @@ class LordNineBossBot {
     try {
       if (interaction.customId.startsWith('boss_killed_')) {
         // Handle "Boss Killed" button click
+        if (!interaction.guild || !interaction.member) {
+          await interaction.reply({ content: '❌ This command can only be used in a server!', ephemeral: true });
+          return;
+        }
+
+        const member = interaction.member as GuildMember;
+        
+        // Check permissions
+        const canUse = await canUseBossButtons(member, this.db);
+        if (!canUse) {
+          const settings = await this.db.getGuildSettings(interaction.guild.id);
+          const errorEmbed = createPermissionErrorEmbed(settings.bossTrackerRole);
+          
+          await interaction.reply({
+            embeds: [errorEmbed],
+            ephemeral: true
+          });
+          return;
+        }
+
         const parts = interaction.customId.split('_');
         const bossId = parts[2];
         const guildId = parts[3];

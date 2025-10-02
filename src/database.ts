@@ -1,4 +1,4 @@
-import sqlite3 from 'sqlite3';
+import * as sqlite3 from 'sqlite3';
 import { Database, open } from 'sqlite';
 import { BossTimer } from './types';
 
@@ -40,6 +40,7 @@ export class DatabaseManager {
         notification_channel TEXT,
         mention_role TEXT,
         warning_minutes INTEGER DEFAULT 5,
+        boss_tracker_role TEXT,
         created_at INTEGER DEFAULT (strftime('%s', 'now')),
         updated_at INTEGER DEFAULT (strftime('%s', 'now'))
       );
@@ -76,6 +77,13 @@ export class DatabaseManager {
       if (!hasReadyColumn) {
         await this.db.exec('ALTER TABLE boss_timers ADD COLUMN ready_sent INTEGER DEFAULT 0');
         console.log('✅ Added ready_sent column');
+      }
+      // Add boss_tracker_role column to guild_settings if it doesn't exist
+      try {
+        await this.db.exec('ALTER TABLE guild_settings ADD COLUMN boss_tracker_role TEXT');
+        console.log('✅ Added boss_tracker_role column to guild_settings');
+      } catch (error) {
+        // Column already exists, which is fine
       }
       
       console.log('✅ Database migration completed');
@@ -199,6 +207,7 @@ export class DatabaseManager {
     notificationChannel: string | null;
     mentionRole: string | null;
     warningMinutes: number;
+    bossTrackerRole: string | null;
   }> {
     if (!this.db) throw new Error('Database not initialized');
 
@@ -210,7 +219,8 @@ export class DatabaseManager {
       timezone: row?.timezone || 'UTC',
       notificationChannel: row?.notification_channel || null,
       mentionRole: row?.mention_role || null,
-      warningMinutes: row?.warning_minutes || 5
+      warningMinutes: row?.warning_minutes || 5,
+      bossTrackerRole: row?.boss_tracker_role || null
     };
   }
 
