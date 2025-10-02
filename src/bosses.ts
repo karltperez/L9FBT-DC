@@ -14,15 +14,18 @@ export const BOSSES: Boss[] = [
   { id: 'generalaquleus', name: 'General Aquleus', level: 85, location: 'Lower Tomb of Tyriosa 2F', cycleHours: 29, category: 'long' },
   { id: 'baronbraudmore', name: 'Baron Baraudmore', level: 88, location: 'Rosevine Bridge', cycleHours: 32, category: 'long' },
   { id: 'amentis', name: 'Amentis', level: 88, location: 'Limestone Cape', cycleHours: 29, category: 'long' },
-  { id: 'ordo', name: 'Ordo', level: 90, location: 'Succesor\'s Paradise', cycleHours: 62, category: 'long' },
   { id: 'larba', name: 'Larba', level: 98, location: 'Garbana Reclaimed Land', cycleHours: 35, category: 'long' },
-
   { id: 'gareth', name: 'Gareth', level: 98, location: 'Deadman\'s Land District 1', cycleHours: 32, category: 'long' },
   { id: 'titore', name: 'Titore', level: 98, location: 'Deadman\'s Land District 2', cycleHours: 37, category: 'long' },
+  { id: 'wanitas', name: 'Wanitas', level: 93, location: 'Snare Swamp', cycleHours: 48, category: 'long' },  
   { id: 'metus', name: 'Metus', level: 93, location: 'Follower\'s Field', cycleHours: 48, category: 'long' },
   { id: 'duplican', name: 'Duplican', level: 93, location: 'Open-Eyed Puppet\'s Throne', cycleHours: 48, category: 'long' },
   { id: 'shuliar', name: 'Shuliar', level: 95, location: 'Masquerade of Hounds', cycleHours: 35, category: 'long' },
-  { id: 'catena', name: 'Catena', level: 100, location: 'Deadman\'s Land District 3', cycleHours: 35, category: 'long' },
+  { id: 'catena', name: 'Catena', level: 100, location: 'Deadman\'s Land District 3', cycleHours: 35, category: 'long' },  
+  { id: 'secreta', name: 'Secreta', level: 100, location: 'Kallion\'s Tomb', cycleHours: 62, category: 'long' },  
+  { id: 'ordo', name: 'Ordo', level: 100, location: 'Succesor\'s Paradise', cycleHours: 62, category: 'long' },
+  { id: 'asta', name: 'Asta', level: 100, location: 'Goldblood Plain', cycleHours: 62, category: 'long' },
+  { id: 'supore', name: 'Supore', level: 100, location: 'Goldblood Plain', cycleHours: 62, category: 'long' },
 
   // Scheduled Bosses (Fixed Weekly Times - GMT+8)
   { id: 'clemantis', name: 'Clemantis', level: 85, location: 'Clemantis Lair', cycleHours: 168, category: 'scheduled', scheduledTimes: ['Monday 11:30', 'Thursday 19:00'] },
