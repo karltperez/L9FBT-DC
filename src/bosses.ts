@@ -17,7 +17,7 @@ export const BOSSES: Boss[] = [
   { id: 'larba', name: 'Larba', level: 98, location: 'Garbana Reclaimed Land', cycleHours: 35, category: 'long' },
   { id: 'gareth', name: 'Gareth', level: 98, location: 'Deadman\'s Land District 1', cycleHours: 32, category: 'long' },
   { id: 'titore', name: 'Titore', level: 98, location: 'Deadman\'s Land District 2', cycleHours: 37, category: 'long' },
-  { id: 'wanitas', name: 'Wanitas', level: 93, location: 'Snare Swamp', cycleHours: 48, category: 'long' },  
+  { id: 'wannitas', name: 'Wannitas', level: 93, location: 'Snare Swamp', cycleHours: 48, category: 'long' },  
   { id: 'metus', name: 'Metus', level: 93, location: 'Follower\'s Field', cycleHours: 48, category: 'long' },
   { id: 'duplican', name: 'Duplican', level: 93, location: 'Open-Eyed Puppet\'s Throne', cycleHours: 48, category: 'long' },
   { id: 'shuliar', name: 'Shuliar', level: 95, location: 'Masquerade of Hounds', cycleHours: 35, category: 'long' },
