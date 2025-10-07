@@ -706,10 +706,17 @@ class LordNineBossBot {
 
       // Try to edit the original interaction message
       try {
-        await interaction.message.edit({
-          embeds: [embed],
-          components: [row1, row2, row3, row4]
-        });
+        if (interaction.deferred) {
+          await interaction.editReply({
+            embeds: [embed],
+            components: [row1, row2, row3, row4]
+          });
+        } else {
+          await interaction.message.edit({
+            embeds: [embed],
+            components: [row1, row2, row3, row4]
+          });
+        }
       } catch (editError) {
         console.error('Error editing setup message:', editError);
       }
