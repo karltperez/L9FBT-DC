@@ -186,19 +186,21 @@ export class DatabaseManager {
     notificationChannel?: string;
     mentionRole?: string;
     warningMinutes?: number;
+    bossTrackerRole?: string;
   }): Promise<void> {
     if (!this.db) throw new Error('Database not initialized');
 
     await this.db.run(`
       INSERT OR REPLACE INTO guild_settings 
-      (guild_id, timezone, notification_channel, mention_role, warning_minutes, updated_at)
-      VALUES (?, ?, ?, ?, ?, strftime('%s', 'now'))
+      (guild_id, timezone, notification_channel, mention_role, warning_minutes, boss_tracker_role, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, strftime('%s', 'now'))
     `, [
       guildId,
       settings.timezone || 'UTC',
       settings.notificationChannel || null,
       settings.mentionRole || null,
-      settings.warningMinutes || 5
+      settings.warningMinutes || 5,
+      settings.bossTrackerRole || null
     ]);
   }
 

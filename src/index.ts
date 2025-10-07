@@ -1,4 +1,4 @@
-import { Client, GatewayIntentBits, Collection, REST, Routes, Events, ActivityType, AutocompleteInteraction, AttachmentBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, GuildMember, PermissionFlagsBits } from 'discord.js';
+import { Client, GatewayIntentBits, Collection, REST, Routes, Events, ActivityType, AutocompleteInteraction, AttachmentBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, GuildMember, PermissionFlagsBits, ChannelSelectMenuBuilder, RoleSelectMenuBuilder, StringSelectMenuBuilder, StringSelectMenuOptionBuilder } from 'discord.js';
 import { config } from 'dotenv';
 import { DatabaseManager } from './database';
 import { processBossKill } from './commands/boss';
@@ -699,10 +699,10 @@ class LordNineBossBot {
         .setEmoji('✅')
         .setDisabled(!session.channelId); // Enable only when channel is selected
 
-      const row1 = new ActionRowBuilder().addComponents(channelSelect);
-      const row2 = new ActionRowBuilder().addComponents(roleSelect);
-      const row3 = new ActionRowBuilder().addComponents(warningSelect);
-      const row4 = new ActionRowBuilder().addComponents(finishButton);
+      const row1 = new ActionRowBuilder<ChannelSelectMenuBuilder>().addComponents(channelSelect);
+      const row2 = new ActionRowBuilder<RoleSelectMenuBuilder>().addComponents(roleSelect);
+      const row3 = new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(warningSelect);
+      const row4 = new ActionRowBuilder<ButtonBuilder>().addComponents(finishButton);
 
       // Try to edit the original interaction message
       try {
