@@ -406,24 +406,18 @@ async function handleStatusCommand(interaction: ChatInputCommandInteraction, db:
     const timeUntilSpawn = timer.nextSpawnTime.getTime() - now.getTime();
     const isReady = timeUntilSpawn <= 0;
 
-    // Use UNIX timestamp for spawn time display
-    let timeDisplay;
-    if (isReady) {
-      timeDisplay = '**✅ READY TO SPAWN!**';
-    } else {
-      // Show countdown using Discord's dynamic timestamp
-      timeDisplay = `<t:${Math.floor(timer.nextSpawnTime.getTime() / 1000)}:R>`;
-    }
+    // Always show countdown using Discord's dynamic timestamp
+    const timeDisplay = `<t:${Math.floor(timer.nextSpawnTime.getTime() / 1000)}:R>`;
 
     const embed = new EmbedBuilder()
-      .setTitle(`${isReady ? '✅' : '⏳'} ${boss.name} Timer`)
+      .setTitle(`⏳ ${boss.name} Timer`)
       .setDescription(`**${boss.name}** (Lv.${boss.level}) at **${boss.location}**`)
       .addFields(
         { name: '⚔️ Last Kill', value: `<t:${Math.floor(timer.lastKillTime.getTime() / 1000)}:R>`, inline: true },
-        { name: isReady ? '✅ Status' : '⏰ Spawns', value: timeDisplay, inline: true },
+        { name: '⏰ Spawns', value: timeDisplay, inline: true },
         { name: '🔄 Cycle', value: `${boss.cycleHours}h`, inline: true }
       )
-      .setColor(isReady ? '#27ae60' : '#3498db')
+      .setColor('#3498db')
       .setThumbnail(`attachment://${boss.id}.png`)
       .setTimestamp()
       .setFooter({ text: '🔄 Updates every 15 minutes' });
@@ -437,19 +431,17 @@ async function handleStatusCommand(interaction: ChatInputCommandInteraction, db:
       files.push(attachment);
     }
 
-    // Create "Boss Killed" button
+    // Create "Boss Killed" button - always show it
     const components = [];
-    if (!isReady) { // Only show button if boss is not ready yet
-      const row = new ActionRowBuilder<ButtonBuilder>()
-        .addComponents(
-          new ButtonBuilder()
-            .setCustomId(`boss_killed_${boss.id}_${interaction.guild!.id}`)
-            .setLabel('Boss Killed')
-            .setStyle(ButtonStyle.Danger)
-            .setEmoji('⚔️')
-        );
-      components.push(row);
-    }
+    const row = new ActionRowBuilder<ButtonBuilder>()
+      .addComponents(
+        new ButtonBuilder()
+          .setCustomId(`boss_killed_${boss.id}_${interaction.guild!.id}`)
+          .setLabel('Boss Killed')
+          .setStyle(ButtonStyle.Danger)
+          .setEmoji('⚔️')
+      );
+    components.push(row);
 
     const reply = await interaction.reply({ embeds: [embed], files, components });
     
@@ -479,26 +471,22 @@ async function handleStatusCommand(interaction: ChatInputCommandInteraction, db:
       const timeUntilSpawn = timer.nextSpawnTime.getTime() - now.getTime();
       const isReady = timeUntilSpawn <= 0;
 
-      // Calculate more precise time display
+      // Calculate time display - just show countdown
+      const hours = Math.floor(Math.abs(timeUntilSpawn) / (1000 * 60 * 60));
+      const minutes = Math.floor((Math.abs(timeUntilSpawn) % (1000 * 60 * 60)) / (1000 * 60));
+      
       let timeDisplay;
-      if (isReady) {
-        timeDisplay = '**✅ READY TO SPAWN!**';
+      if (hours > 0) {
+        timeDisplay = `**${hours}h ${minutes}m**`;
+      } else if (minutes > 0) {
+        timeDisplay = `**${minutes}m**`;
       } else {
-        const hours = Math.floor(timeUntilSpawn / (1000 * 60 * 60));
-        const minutes = Math.floor((timeUntilSpawn % (1000 * 60 * 60)) / (1000 * 60));
-        
-        if (hours > 0) {
-          timeDisplay = `**${hours}h ${minutes}m**`;
-        } else if (minutes > 0) {
-          timeDisplay = `**${minutes}m**`;
-        } else {
-          const seconds = Math.floor((timeUntilSpawn % (1000 * 60)) / 1000);
-          timeDisplay = `**${Math.max(0, seconds)}s**`;
-        }
+        const seconds = Math.floor((Math.abs(timeUntilSpawn) % (1000 * 60)) / 1000);
+        timeDisplay = `**${Math.max(0, seconds)}s**`;
       }
 
       embed.addFields({
-        name: `${isReady ? '✅' : '⏳'} ${boss.name} (Lv.${boss.level})`,
+        name: `⏳ ${boss.name} (Lv.${boss.level})`,
         value: timeDisplay,
         inline: true
       });

@@ -310,28 +310,18 @@ class LordNineBossBot {
   private async createDynamicTimerEmbed(boss: any, timer: any) {
     const { EmbedBuilder } = await import('discord.js');
     
-    const now = new Date();
-    const timeUntilSpawn = timer.nextSpawnTime.getTime() - now.getTime();
-    const isReady = timeUntilSpawn <= 0;
-
-    // Use UNIX timestamp for spawn time display
-    let timeDisplay;
-    if (isReady) {
-      timeDisplay = '**✅ READY TO SPAWN!**';
-    } else {
-      // Show countdown using Discord's dynamic timestamp
-      timeDisplay = `<t:${Math.floor(timer.nextSpawnTime.getTime() / 1000)}:R>`;
-    }
+    // Always show countdown using Discord's dynamic timestamp
+    const timeDisplay = `<t:${Math.floor(timer.nextSpawnTime.getTime() / 1000)}:R>`;
 
     return new EmbedBuilder()
-      .setTitle(`${isReady ? '✅' : '⏳'} ${boss.name} Timer`)
+      .setTitle(`⏳ ${boss.name} Timer`)
       .setDescription(`**${boss.name}** (Lv.${boss.level}) at **${boss.location}**`)
       .addFields(
         { name: '⚔️ Last Kill', value: `<t:${Math.floor(timer.lastKillTime.getTime() / 1000)}:R>`, inline: true },
-        { name: isReady ? '✅ Status' : '⏰ Spawns', value: timeDisplay, inline: true },
+        { name: '⏰ Spawns', value: timeDisplay, inline: true },
         { name: '🔄 Cycle', value: `${boss.cycleHours}h`, inline: true }
       )
-      .setColor(isReady ? '#27ae60' : '#3498db')
+      .setColor('#3498db')
       .setThumbnail(`attachment://${boss.id}.png`)
       .setTimestamp()
       .setFooter({ text: '🔄 Updates every 15 minutes' });
@@ -366,26 +356,22 @@ class LordNineBossBot {
       const timeUntilSpawn = timer.nextSpawnTime.getTime() - now.getTime();
       const isReady = timeUntilSpawn <= 0;
 
-      // Calculate more precise time display
+      // Calculate time display - just show countdown
+      const hours = Math.floor(Math.abs(timeUntilSpawn) / (1000 * 60 * 60));
+      const minutes = Math.floor((Math.abs(timeUntilSpawn) % (1000 * 60 * 60)) / (1000 * 60));
+      const seconds = Math.floor((Math.abs(timeUntilSpawn) % (1000 * 60)) / 1000);
+      
       let timeDisplay;
-      if (isReady) {
-        timeDisplay = '**✅ READY TO SPAWN!**';
+      if (hours > 0) {
+        timeDisplay = `**${hours}h ${minutes}m ${seconds}s**`;
+      } else if (minutes > 0) {
+        timeDisplay = `**${minutes}m ${seconds}s**`;
       } else {
-        const hours = Math.floor(timeUntilSpawn / (1000 * 60 * 60));
-        const minutes = Math.floor((timeUntilSpawn % (1000 * 60 * 60)) / (1000 * 60));
-        const seconds = Math.floor((timeUntilSpawn % (1000 * 60)) / 1000);
-        
-        if (hours > 0) {
-          timeDisplay = `**${hours}h ${minutes}m ${seconds}s**`;
-        } else if (minutes > 0) {
-          timeDisplay = `**${minutes}m ${seconds}s**`;
-        } else {
-          timeDisplay = `**${Math.max(0, seconds)}s**`;
-        }
+        timeDisplay = `**${Math.max(0, seconds)}s**`;
       }
 
       embed.addFields({
-        name: `${isReady ? '✅' : '⏳'} ${boss.name} (Lv.${boss.level})`,
+        name: `⏳ ${boss.name} (Lv.${boss.level})`,
         value: timeDisplay,
         inline: true
       });
