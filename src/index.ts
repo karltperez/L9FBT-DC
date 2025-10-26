@@ -213,6 +213,15 @@ class LordNineBossBot {
       }
     });
 
+    // Auto-progression: Check every minute for spawned bosses and add 3 minutes
+    cron.schedule('* * * * *', async () => {
+      try {
+        await this.autoProgressSpawnedBosses();
+      } catch (error) {
+        console.error('Error in auto-progression:', error);
+      }
+    });
+
     // Cleanup old ready bosses every hour (remove timers that have been ready for 12+ hours)
     cron.schedule('0 * * * *', async () => {
       try {
@@ -223,6 +232,7 @@ class LordNineBossBot {
     });
 
     console.log('⏰ Dynamic timer updater started (15-minute intervals)');
+    console.log('🔄 Auto-progression scheduler started (1-minute intervals)');
   }
 
   private async updateDynamicTimerMessages(timer: any): Promise<void> {
@@ -904,6 +914,44 @@ class LordNineBossBot {
           console.error('Error sending error reply:', replyError);
         }
       }
+    }
+  }
+
+  private async autoProgressSpawnedBosses(): Promise<void> {
+    try {
+      const timers = await this.db.getActiveTimers();
+      const now = new Date();
+
+      for (const timer of timers) {
+        // Check if boss has spawned (spawn time has passed)
+        if (timer.nextSpawnTime.getTime() <= now.getTime()) {
+          const boss = BOSSES.find(b => b.id === timer.bossId);
+          if (!boss) continue;
+
+          // Add 3 minutes + full cycle to create next spawn time
+          const threeMinutes = 3 * 60 * 1000; // 3 minutes in milliseconds
+          const fullCycle = boss.cycleHours * 60 * 60 * 1000; // Full cycle in milliseconds
+          const newSpawnTime = new Date(timer.nextSpawnTime.getTime() + fullCycle + threeMinutes);
+
+          // Update the timer in the database
+          const updatedTimer = {
+            ...timer,
+            lastKillTime: timer.nextSpawnTime, // Current spawn time becomes the kill time
+            nextSpawnTime: newSpawnTime,
+            warning_sent: false,
+            ready_sent: false
+          };
+
+          await this.db.setBossTimer(updatedTimer);
+          
+          console.log(`🔄 Auto-progressed ${boss.name}: Next spawn in ${boss.cycleHours}h 3m (${newSpawnTime.toLocaleString()})`);
+          
+          // Update any dynamic timer messages for this boss
+          await this.updateDynamicTimerMessages(updatedTimer);
+        }
+      }
+    } catch (error) {
+      console.error('Error in auto-progression:', error);
     }
   }
 
