@@ -402,10 +402,6 @@ async function handleStatusCommand(interaction: ChatInputCommandInteraction, db:
       return;
     }
 
-    const now = new Date();
-    const timeUntilSpawn = timer.nextSpawnTime.getTime() - now.getTime();
-    const isReady = timeUntilSpawn <= 0;
-
     // Always show countdown using Discord's dynamic timestamp
     const timeDisplay = `<t:${Math.floor(timer.nextSpawnTime.getTime() / 1000)}:R>`;
 
@@ -449,6 +445,7 @@ async function handleStatusCommand(interaction: ChatInputCommandInteraction, db:
     const message = await reply.fetch();
     await db.addDynamicTimerMessage(boss.id, interaction.guild!.id, interaction.channel!.id, message.id, 'status');
   } else {
+    // New unified dashboard view
     const timers = await db.getGuildTimers(interaction.guild!.id);
     
     if (timers.length === 0) {
@@ -456,49 +453,108 @@ async function handleStatusCommand(interaction: ChatInputCommandInteraction, db:
       return;
     }
 
-    const embed = new EmbedBuilder()
-      .setTitle('🏹 Active Boss Timers')
-      .setDescription('Here are all active boss timers for this server:')
-      .setColor('#3498db')
-      .setTimestamp();
+    // Create boss spawn timeline
+    const now = getCurrentGMT8Time();
+    const bossData = [];
 
-    const now = new Date();
-    
-    for (const timer of timers.slice(0, 10)) {
+    for (const timer of timers) {
       const boss = getBossById(timer.bossId);
       if (!boss) continue;
 
-      const timeUntilSpawn = timer.nextSpawnTime.getTime() - now.getTime();
-      const isReady = timeUntilSpawn <= 0;
-
-      // Calculate time display - just show countdown
-      const hours = Math.floor(Math.abs(timeUntilSpawn) / (1000 * 60 * 60));
-      const minutes = Math.floor((Math.abs(timeUntilSpawn) % (1000 * 60 * 60)) / (1000 * 60));
+      // Convert spawn time to GMT+8
+      const spawnTimeGMT8 = new Date(timer.nextSpawnTime.getTime() + (8 * 60 * 60 * 1000));
+      const timeUntilSpawn = timer.nextSpawnTime.getTime() - new Date().getTime();
       
-      let timeDisplay;
-      if (hours > 0) {
-        timeDisplay = `**${hours}h ${minutes}m**`;
-      } else if (minutes > 0) {
-        timeDisplay = `**${minutes}m**`;
-      } else {
-        const seconds = Math.floor((Math.abs(timeUntilSpawn) % (1000 * 60)) / 1000);
-        timeDisplay = `**${Math.max(0, seconds)}s**`;
-      }
-
-      embed.addFields({
-        name: `⏳ ${boss.name} (Lv.${boss.level})`,
-        value: timeDisplay,
-        inline: true
+      bossData.push({
+        boss,
+        timer,
+        spawnTimeGMT8,
+        timeUntilSpawn,
+        isSpawned: timeUntilSpawn <= 0
       });
     }
 
-    embed.setFooter({ text: '🔄 Use /boss status <name> for live updates' });
+    // Sort by spawn time
+    bossData.sort((a, b) => a.spawnTimeGMT8.getTime() - b.spawnTimeGMT8.getTime());
+
+    // Split into upcoming and already spawned
+    const upcoming = bossData.filter(data => !data.isSpawned);
+    const alreadySpawned = bossData.filter(data => data.isSpawned);
+
+    // Format current date
+    const currentDate = now.toLocaleDateString('en-US', { 
+      weekday: 'long', 
+      year: 'numeric', 
+      month: 'short', 
+      day: 'numeric' 
+    });
+
+    const embed = new EmbedBuilder()
+      .setTitle(`✅ Upcoming Spawns — ${currentDate}`)
+      .setColor('#27ae60')
+      .setTimestamp()
+      .setFooter({ text: '🔄 Updates every 15 minutes • All times in GMT+8' });
+
+    // Add upcoming spawns section
+    if (upcoming.length > 0) {
+      const upcomingLines = upcoming.slice(0, 15).map(data => {
+        const formattedDate = data.spawnTimeGMT8.toLocaleDateString('en-US', {
+          weekday: 'long',
+          year: 'numeric',
+          month: 'long',
+          day: 'numeric'
+        });
+        const formattedTime = data.spawnTimeGMT8.toLocaleTimeString('en-US', {
+          hour: 'numeric',
+          minute: '2-digit',
+          hour12: true
+        });
+        
+        const relativeTime = `<t:${Math.floor(data.timer.nextSpawnTime.getTime() / 1000)}:R>`;
+        
+        return `🟢 **${data.boss.name}** — ${formattedDate} ${formattedTime} • ${relativeTime}`;
+      });
+
+      embed.setDescription(upcomingLines.join('\n'));
+    }
+
+    // Add already spawned section  
+    if (alreadySpawned.length > 0) {
+      // Auto-progress spawned bosses (add 3 minutes to simulate next cycle)
+      const spawnedLines = alreadySpawned.slice(0, 10).map(data => {
+        // Calculate next spawn time (current spawn + cycle hours + 3 minutes buffer)
+        const nextCycleTime = new Date(data.timer.nextSpawnTime.getTime() + (data.boss.cycleHours * 60 * 60 * 1000) + (3 * 60 * 1000));
+        const nextCycleGMT8 = new Date(nextCycleTime.getTime() + (8 * 60 * 60 * 1000));
+        
+        const formattedDate = nextCycleGMT8.toLocaleDateString('en-US', {
+          weekday: 'long',
+          year: 'numeric',
+          month: 'long',  
+          day: 'numeric'
+        });
+        const formattedTime = nextCycleGMT8.toLocaleTimeString('en-US', {
+          hour: 'numeric',
+          minute: '2-digit',
+          hour12: true
+        });
+        
+        const relativeTime = `<t:${Math.floor(nextCycleTime.getTime() / 1000)}:R>`;
+        
+        return `🔁 **${data.boss.name}** — ${formattedDate} ${formattedTime} • ${relativeTime}`;
+      });
+
+      embed.addFields({
+        name: '💀 Already Spawned (rolled to next window)',
+        value: spawnedLines.join('\n'),
+        inline: false
+      });
+    }
 
     const reply = await interaction.reply({ embeds: [embed] });
     
     // Store this message for dynamic updates (group status)
     const message = await reply.fetch();
-    await db.addDynamicTimerMessage('all', interaction.guild!.id, interaction.channel!.id, message.id, 'group');
+    await db.addDynamicTimerMessage('all', interaction.guild!.id, interaction.channel!.id, message.id, 'timeline');
   }
 }
 
